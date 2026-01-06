@@ -8,12 +8,23 @@ from pdf_intelligence.stage4_dates import extract_date
 from pdf_intelligence.stage5_confidence import score_hypothesis
 
 
-def choose_best_hypothesis(rows, min_rows=10):
+def choose_best_hypothesis(rows, min_rows=5):
     """
     Selects the best schema hypothesis.
     - Uses ranking_score for comparison
     - Returns calibrated confidence ∈ [0, 1]
     """
+    dated = []
+    for r in rows:
+        d = extract_date(r)
+        if d is not None:
+            dated.append((d, r))
+
+    print("TOTAL ROWS:", len(rows))
+    print("DATED ROWS:", len(dated))
+
+    for i, (d, r) in enumerate(dated[:5]):
+        print(i, d, [w["text"] for w in r])
 
     # -------------------------------
     # Filter rows with valid dates

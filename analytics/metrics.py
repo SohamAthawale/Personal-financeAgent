@@ -1,6 +1,9 @@
 import pandas as pd
 
 
+# ==================================================
+# HELPERS
+# ==================================================
 def is_opening_balance_row(row):
     desc = str(row.get("description", "")).lower()
 
@@ -12,10 +15,24 @@ def is_opening_balance_row(row):
     )
 
 
-def compute_metrics_from_csv(
-    csv_path="/Users/sohamathawale/Documents/GitHub/Personal-financeAgent/output/transactions_clean.csv"
-):
-    df = pd.read_csv(csv_path, parse_dates=["date"])
+# ==================================================
+# CORE METRICS (DATAFRAME-BASED)
+# ==================================================
+def compute_metrics_from_df(df: pd.DataFrame):
+    """
+    Compute financial metrics from a transactions DataFrame.
+
+    Expected columns:
+    - date
+    - description
+    - deposit
+    - withdrawal
+    - balance
+    - confidence
+    """
+
+    if df.empty:
+        raise ValueError("No transactions to compute metrics")
 
     # ---------- Schema validation ----------
     required = {
@@ -24,17 +41,26 @@ def compute_metrics_from_csv(
         "deposit",
         "withdrawal",
         "balance",
-        "confidence"
+        "confidence",
     }
 
     missing = required - set(df.columns)
     if missing:
         raise ValueError(f"Missing required columns: {missing}")
 
+    # Ensure datetime
+    df = df.copy()
+    df["date"] = pd.to_datetime(df["date"])
+
     # ---------- Remove ONLY true opening balance ----------
+    # ---------- RAW dataframe (bank-exact, opening balance removed only) ----------
+
     df_txn = df.loc[~df.apply(is_opening_balance_row, axis=1)].copy()
 
     # ---------- Core totals ----------
+    # ---------- RAW bank totals (additive, no behavior change) ----------
+
+
     total_income = round(df_txn["deposit"].sum(), 2)
     total_expense = round(df_txn["withdrawal"].sum(), 2)
     net_cashflow = round(total_income - total_expense, 2)

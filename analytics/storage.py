@@ -1,60 +1,40 @@
-import pandas as pd
-from pathlib import Path
+from typing import List, Dict
+from sqlalchemy.orm import Session
 
-DATA_DIR = Path("/Users/sohamathawale/Documents/GitHub/Personal-financeAgent/output")
-DATA_DIR.mkdir(exist_ok=True)
-
-CSV_PATH = DATA_DIR / "transactions_clean.csv"
-
-# ✅ AUTHORITATIVE SCHEMA
-COLUMNS = [
-    "date",
-    "description",
-    "deposit",
-    "withdrawal",
-    "amount",
-    "balance",
-    "confidence",
-    "source_pdf"
-]
+from models import Transaction
 
 
-def save_transactions_csv(transactions):
+def save_transactions_db(
+    *,
+    db: Session,
+    statement_id: int,
+    transactions: List[Dict]
+) -> None:
     """
-    Persist transactions in an idempotent, bank-safe way.
+    Persist extracted transactions to DB.
 
-    Rules:
-    - Overwrite on each run (no duplication)
-    - Preserve semantic columns (deposit / withdrawal / amount)
-    - Backward compatible with older CSVs
+    Guarantees:
+    - Statement-scoped (no cross-user pollution)
+    - Idempotent per statement
+    - No CSV / filesystem dependency
     """
 
-    df = pd.DataFrame(transactions)
-
-    if df.empty:
+    if not transactions:
         raise ValueError("No transactions to save")
 
-    # -------------------------------
-    # Ensure required columns exist
-    # -------------------------------
-    for col in COLUMNS:
-        if col not in df.columns:
-            df[col] = 0.0 if col in ("deposit", "withdrawal", "amount") else None
-
-    # Enforce schema + order
-    df = df[COLUMNS]
-
-    # -------------------------------
-    # Optional: defensive deduplication
-    # (safe even if unnecessary)
-    # -------------------------------
-    df = df.drop_duplicates(
-        subset=["date", "description", "amount", "balance", "source_pdf"]
+    db.bulk_save_objects(
+        [
+            Transaction(
+                statement_id=statement_id,
+                date=t["date"],
+                description=t["description"],
+                merchant=t.get("merchant"),
+                amount=t["amount"],
+                txn_type=t.get("type"),
+                raw=t,
+            )
+            for t in transactions
+        ]
     )
 
-    # -------------------------------
-    # 🔒 OVERWRITE (IDEMPOTENT)
-    # -------------------------------
-    df.to_csv(CSV_PATH, index=False)
-
-    return df
+    db.commit()

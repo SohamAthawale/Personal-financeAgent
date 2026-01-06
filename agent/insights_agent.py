@@ -1,9 +1,20 @@
+# analytics/insights_agent.py
+
 import json
 import requests
 import time
+from typing import List, Dict, Any
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "llama3"
+# ==================================================
+# BACKEND CONFIG (NO HARDCODED VALUES)
+# ==================================================
+try:
+    from config.llm import LLM_ENABLED, OLLAMA_URL, LLM_MODEL
+except ImportError:
+    # Safe defaults
+    LLM_ENABLED = True
+    OLLAMA_URL = "http://localhost:11434/api/generate"
+    LLM_MODEL = "llama3"
 
 
 # ======================================================
@@ -25,7 +36,10 @@ Your role is EXPLANATION, not CALCULATION.
 """
 
 
-def make_json_safe(obj):
+# ======================================================
+# JSON SAFETY
+# ======================================================
+def make_json_safe(obj: Any) -> Any:
     """
     Recursively convert pandas / numpy / datetime objects
     into JSON-serializable primitives.
@@ -49,35 +63,60 @@ def make_json_safe(obj):
 
 
 # ======================================================
-# 🧠 LLM INSIGHT GENERATOR (METRIC-LOCKED)
+# 🧠 LLM INSIGHT GENERATOR (BACKEND-ONLY)
 # ======================================================
-def generate_insights(transactions, metrics, max_retries=3):
+def generate_insights(
+    metrics: Dict[str, Any],
+    transaction_sample: List[Dict[str, Any]] | None = None,
+    max_retries: int = 3,
+) -> Dict[str, Any]:
     """
     Generates qualitative insights ONLY.
-    All numeric totals MUST come from metrics.
+
+    - Backend-only
+    - Metrics are authoritative
+    - Transactions are pattern samples only
+    - Safe to expose via API
     """
 
-    # ----------------------------------
+    # -------------------------------
+    # Hard guards
+    # -------------------------------
+    if not LLM_ENABLED:
+        return {
+            "type": "llm_insight",
+            "model": None,
+            "content": "LLM disabled by server configuration."
+        }
+
+    if not isinstance(metrics, dict):
+        raise ValueError("metrics must be a dict")
+
+    if transaction_sample is None:
+        transaction_sample = []
+
+    # -------------------------------
     # 🔐 Authoritative Metrics Block
-    # ----------------------------------
+    # -------------------------------
     metrics_block = {
         "TOTAL_INCOME": metrics["total_income"],
         "TOTAL_EXPENSE": metrics["total_expense"],
         "NET_CASHFLOW": metrics["net_cashflow"],
         "MONTHLY_CASHFLOW": metrics["monthly_cashflow"],
-        "AVG_CONFIDENCE": metrics["avg_confidence"]
+        "AVG_CONFIDENCE": metrics["avg_confidence"],
     }
 
     payload = {
         "AUTHORITATIVE_METRICS_USE_VERBATIM": metrics_block,
-        "TRANSACTIONS_PATTERN_ONLY_SAMPLE": transactions[:20]
+        # 🔒 CAP SAMPLE SIZE (PROMPT SAFETY)
+        "TRANSACTIONS_PATTERN_ONLY_SAMPLE": transaction_sample[:15],
     }
 
     safe_payload = make_json_safe(payload)
 
-    # ----------------------------------
+    # -------------------------------
     # 🧾 PROMPT — METRICS ARE LAW
-    # ----------------------------------
+    # -------------------------------
     prompt = f"""
 {SYSTEM_PROMPT}
 
@@ -98,27 +137,32 @@ PROVIDE:
 If unsure, REPEAT the provided numbers instead of guessing.
 """
 
-    # ----------------------------------
+    # -------------------------------
     # 🔁 Retry-safe Ollama Call
-    # ----------------------------------
+    # -------------------------------
     for attempt in range(1, max_retries + 1):
         try:
             response = requests.post(
                 OLLAMA_URL,
                 json={
-                    "model": MODEL,
+                    "model": LLM_MODEL,
                     "prompt": prompt,
                     "stream": False,
                     "options": {
                         "temperature": 0.1,   # 🔒 low creativity
-                        "top_p": 0.9
-                    }
+                        "top_p": 0.9,
+                    },
                 },
-                timeout=90
+                timeout=90,
             )
 
             response.raise_for_status()
-            return response.json()["response"]
+
+            return {
+                "type": "llm_insight",
+                "model": LLM_MODEL,
+                "content": response.json().get("response", ""),
+            }
 
         except requests.exceptions.ReadTimeout:
             print(f"⏳ LLM timeout (attempt {attempt}/{max_retries})")
@@ -128,11 +172,15 @@ If unsure, REPEAT the provided numbers instead of guessing.
             print(f"⚠️ LLM error: {e}")
             break
 
-    # ----------------------------------
+    # -------------------------------
     # 🧯 Graceful Fallback
-    # ----------------------------------
-    return (
-        "⚠️ LLM insights unavailable.\n"
-        "Financial metrics are computed correctly.\n"
-        "You may retry insight generation."
-    )
+    # -------------------------------
+    return {
+        "type": "llm_insight",
+        "model": None,
+        "content": (
+            "LLM insights unavailable.\n"
+            "Financial metrics are computed correctly.\n"
+            "You may retry insight generation."
+        ),
+    }

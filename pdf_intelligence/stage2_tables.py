@@ -1,27 +1,33 @@
 from collections import defaultdict
 import re
 
-DATE_REGEX = re.compile(r"\d{2}[/-]\d{2}[/-]\d{2,4}")
+# ----------------------------------
+# Regexes
+# ----------------------------------
+NUMERIC_DATE = re.compile(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b")
+TEXTUAL_DATE = re.compile(
+    r"\b\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+\d{4}\b",
+    re.IGNORECASE
+)
+
 AMOUNT_REGEX = re.compile(r"\d{1,3}(?:,\d{3})*\.\d{2}")
 
-Y_TOL = 6  # vertical tolerance in PDF units
+Y_TOL = 8  # ⬅️ important: PDFs need wider tolerance
 
 
 def detect_candidate_rows(words):
     """
-    Robust transaction row detection for bank statements.
-    Correctly merges multi-line rows (critical for opening deposits).
+    Robust transaction row detector for bank statements.
+    Handles split words and multi-token dates.
     """
 
-    # Group by page first
     by_page = defaultdict(list)
     for w in words:
         by_page[w["page"]].append(w)
 
     candidates = []
 
-    for page, page_words in by_page.items():
-        # Sort top to bottom
+    for page_words in by_page.values():
         page_words.sort(key=lambda w: w["y"])
 
         current_row = []
@@ -37,7 +43,6 @@ def detect_candidate_rows(words):
 
             last_y = w["y"]
 
-        # Flush last row
         if current_row and _is_transaction_row(current_row):
             candidates.append(current_row)
 
@@ -45,6 +50,18 @@ def detect_candidate_rows(words):
 
 
 def _is_transaction_row(row):
-    has_date = any(DATE_REGEX.search(w["text"]) for w in row)
-    has_amount = any(AMOUNT_REGEX.search(w["text"]) for w in row)
-    return has_date and has_amount
+    texts = [w["text"] for w in row]
+    joined = " ".join(texts)
+
+    # Date must exist (numeric OR textual)
+    has_date = (
+        NUMERIC_DATE.search(joined)
+        or TEXTUAL_DATE.search(joined)
+    )
+
+    # At least 2 numeric values (amount + balance)
+    amount_count = sum(
+        1 for t in texts if AMOUNT_REGEX.search(t)
+    )
+
+    return bool(has_date and amount_count >= 2)

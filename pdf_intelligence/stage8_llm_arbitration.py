@@ -1,9 +1,24 @@
+# pdf_intelligence/stage8_llm_arbitration.py
+
 import json
 import requests
+from typing import List, Dict, Any
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "llama3"
+# ==================================================
+# BACKEND CONFIG (NO HARDCODED VALUES)
+# ==================================================
+try:
+    from config.llm import LLM_ENABLED, OLLAMA_URL, LLM_MODEL
+except ImportError:
+    # Safe defaults
+    LLM_ENABLED = True
+    OLLAMA_URL = "http://localhost:11434/api/generate"
+    LLM_MODEL = "llama3"
 
+
+# ==================================================
+# SYSTEM PROMPT (STRICT, NON-GENERATIVE)
+# ==================================================
 SYSTEM_PROMPT = """
 You are a financial statement schema judge.
 
@@ -17,16 +32,42 @@ Rules:
 - No explanations
 """
 
-def llm_arbitrate(candidates):
+
+# ==================================================
+# LLM ARBITRATION (BACKEND ONLY)
+# ==================================================
+def llm_arbitrate(
+    candidates: List[Dict[str, Any]]
+) -> Dict[str, Any] | None:
     """
-    candidates = list of dicts:
-    {
-        "schema": {...},
-        "confidence": 0.78,
-        "variant": "drop_first_3"
-    }
+    Selects the best schema candidate using constrained LLM arbitration.
+
+    candidates = [
+        {
+            "schema": {...},
+            "confidence": 0.78,
+            "variant": "drop_first_3"
+        },
+        ...
+    ]
+
+    Returns:
+        - winning candidate dict
+        - None if arbitration fails or is disabled
     """
 
+    # -------------------------------
+    # Hard guards
+    # -------------------------------
+    if not LLM_ENABLED:
+        return None
+
+    if not candidates or len(candidates) < 2:
+        return None
+
+    # -------------------------------
+    # Prompt
+    # -------------------------------
     prompt = f"""
 {SYSTEM_PROMPT}
 
@@ -39,27 +80,47 @@ Output JSON:
 {{ "winner_index": number }}
 """
 
+    # -------------------------------
+    # LLM Call
+    # -------------------------------
     try:
         resp = requests.post(
             OLLAMA_URL,
             json={
-                "model": MODEL,
+                "model": LLM_MODEL,
                 "prompt": prompt,
                 "stream": False,
-                "options": {"temperature": 0}
+                "options": {
+                    "temperature": 0.0,  # 🔒 deterministic
+                    "top_p": 1.0
+                },
             },
-            timeout=30
+            timeout=30,
         )
 
-        raw = resp.json()["response"]
+        resp.raise_for_status()
+
+        raw = resp.json().get("response", "")
+
+        # -------------------------------
+        # Strict JSON extraction
+        # -------------------------------
         start, end = raw.find("{"), raw.rfind("}") + 1
+        if start == -1 or end == -1:
+            return None
+
         result = json.loads(raw[start:end])
 
         idx = result.get("winner_index")
-        if idx is None or idx >= len(candidates):
+
+        if not isinstance(idx, int):
+            return None
+
+        if idx < 0 or idx >= len(candidates):
             return None
 
         return candidates[idx]
 
     except Exception:
+        # Fail-safe: deterministic pipeline continues
         return None
