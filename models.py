@@ -11,6 +11,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+
 
 Base = declarative_base()
 
@@ -23,13 +25,27 @@ class User(Base):
 
     id = Column(Integer, primary_key=True)
     phone = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    password_hash = Column(String(255), nullable=True)
 
     statements = relationship(
         "Statement",
         back_populates="user",
         cascade="all, delete-orphan"
     )
+
+    # -----------------------------
+    # Password helpers
+    # -----------------------------
+    def set_password(self, password: str):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password: str) -> bool:
+        if not self.password_hash:
+            return False
+        return check_password_hash(self.password_hash, password)
 
 
 # =========================

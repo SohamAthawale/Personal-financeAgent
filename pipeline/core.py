@@ -2,6 +2,7 @@ from typing import Dict, Any
 from sqlalchemy.orm import Session
 
 from agent.user_profile import UserProfile
+from models import User
 
 # PDF intelligence
 from pdf_intelligence.stage1_layout import extract_layout
@@ -143,7 +144,8 @@ def parse_statement(
 # ==================================================
 # 2️⃣ ANALYTICS (DASHBOARD)
 # ==================================================
-from typing import Dict, Any
+from datetime import datetime
+from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 
 from models import Transaction, Statement
@@ -161,7 +163,9 @@ from analytics.counterparty_analysis import upi_counterparty_summary
 def compute_analytics(
     *,
     db: Session,
-    user_id: int
+    user_id: int,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """
     Deterministic financial analytics.
@@ -171,17 +175,25 @@ def compute_analytics(
     - No LLM involvement
     - Order-independent
     - Auditable & reproducible
+    - Time-window aware (monthly / rolling / full)
     """
 
     # --------------------------------------------------
     # 1️⃣ Fetch transactions (DB = source of truth)
     # --------------------------------------------------
-    txns = (
+    q = (
         db.query(Transaction)
         .join(Statement)
         .filter(Statement.user_id == user_id)
-        .all()
     )
+
+    if start_date:
+        q = q.filter(Transaction.date >= start_date)
+
+    if end_date:
+        q = q.filter(Transaction.date < end_date)
+
+    txns = q.all()
 
     # --------------------------------------------------
     # 2️⃣ Empty-state safety
@@ -189,7 +201,12 @@ def compute_analytics(
     if not txns:
         return {
             "status": "no_data",
-            "message": "No transactions found. Upload a bank statement.",
+            "message": "No transactions found for this period.",
+            "period": {
+                "type": "custom" if start_date or end_date else "all_time",
+                "start": start_date.isoformat() if start_date else None,
+                "end": end_date.isoformat() if end_date else None,
+            },
             "metrics": None,
             "categories": [],
             "debits": [],
@@ -211,7 +228,6 @@ def compute_analytics(
     assert metrics["total_income"] >= 0, "Income cannot be negative"
     assert metrics["total_expense"] >= 0, "Expense cannot be negative"
 
-    # income - expense ≈ net_cashflow
     delta = (
         metrics["total_income"]
         - metrics["total_expense"]
@@ -245,15 +261,31 @@ def compute_analytics(
     }
 
     # --------------------------------------------------
-    # 9️⃣ Final payload
+    # 9️⃣ Period metadata
+    # --------------------------------------------------
+    period_meta = {
+        "type": "all_time",
+        "start": None,
+        "end": None,
+    }
+
+    if start_date or end_date:
+        period_meta = {
+            "type": "custom",
+            "start": start_date.isoformat() if start_date else None,
+            "end": end_date.isoformat() if end_date else None,
+        }
+
+    # --------------------------------------------------
+    # 🔟 Final payload
     # --------------------------------------------------
     return {
         "status": "success",
+        "period": period_meta,
         "metrics": metrics,
         "categories": category_spending.to_dict(orient="records"),
         "debits": all_debits.to_dict(orient="records"),
     }
-
 
 # ==================================================
 # 3️⃣ INSIGHTS (LLM)
@@ -346,26 +378,25 @@ def generate_insights_view(
 # ==================================================
 # 4️⃣ AGENT
 # ==================================================
-def run_agent_view(
-    *,
-    db: Session,
-    user: UserProfile
-) -> Dict[str, Any]:
-
+def run_agent_view(*, db, user_id, goals=None):
     txns = (
         db.query(Transaction)
         .join(Statement)
-        .filter(Statement.user_id == user.id)
+        .filter(Statement.user_id == user_id)
         .all()
     )
 
+    if not txns:
+        return {
+            "status": "no_data",
+            "message": "No transactions found"
+        }
+
     df = transactions_to_df(txns)
-    metrics = compute_metrics_from_df(df)
+    metrics, df_txn = compute_metrics_from_df(df)
 
-    result = run_agent(
-        df=df,
+    return run_agent(
+        df=df_txn,
         metrics=metrics,
-        user=user
+        goals=goals
     )
-
-    return make_json_safe(result)

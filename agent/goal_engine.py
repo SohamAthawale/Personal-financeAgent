@@ -4,38 +4,38 @@ from datetime import date
 class FinancialGoal:
     def __init__(self, name, target_amount, deadline, priority="medium"):
         self.name = name
-        self.target_amount = target_amount
+        self.target_amount = float(target_amount)
         self.deadline = deadline
         self.priority = priority
 
 
 def months_remaining(deadline):
     today = date.today()
-    return max(
-        1,
-        (deadline.year - today.year) * 12 + deadline.month - today.month
-    )
+    months = (deadline.year - today.year) * 12 + (deadline.month - today.month)
+    return max(1, months)
 
 
 def evaluate_goal(goal, metrics):
     months_left = months_remaining(goal.deadline)
 
-    # ---------- derive monthly values safely ----------
+    total_income = float(metrics.get("total_income", 0))
+    total_expense = float(metrics.get("total_expense", 0))
+
     monthly_cashflows = metrics.get("monthly_cashflow", [])
     num_months = max(1, len(monthly_cashflows))
 
-    avg_monthly_income = metrics["total_income"] / num_months
-    avg_monthly_expense = metrics["total_expense"] / num_months
+    avg_monthly_income = total_income / num_months
+    avg_monthly_expense = total_expense / num_months
     avg_monthly_saving = avg_monthly_income - avg_monthly_expense
 
     required_monthly_saving = goal.target_amount / months_left
 
     return {
         "goal": goal.name,
-        "months_remaining": months_left,
+        "months_remaining": int(months_left),
         "required_monthly_saving": round(required_monthly_saving, 2),
         "current_monthly_saving": round(avg_monthly_saving, 2),
-        "feasible": avg_monthly_saving >= required_monthly_saving,
+        "feasible": bool(avg_monthly_saving >= required_monthly_saving),
     }
 
 

@@ -5,6 +5,10 @@ import pandas as pd
 # HELPERS
 # ==================================================
 def is_opening_balance_row(row):
+    """
+    Detect true opening balance rows so they can be excluded
+    from transaction-based analytics.
+    """
     desc = str(row.get("description", "")).lower()
 
     return (
@@ -48,22 +52,22 @@ def compute_metrics_from_df(df: pd.DataFrame):
     if missing:
         raise ValueError(f"Missing required columns: {missing}")
 
-    # Ensure datetime
+    # ---------- Normalize ----------
     df = df.copy()
     df["date"] = pd.to_datetime(df["date"])
 
     # ---------- Remove ONLY true opening balance ----------
-    # ---------- RAW dataframe (bank-exact, opening balance removed only) ----------
-
     df_txn = df.loc[~df.apply(is_opening_balance_row, axis=1)].copy()
 
     # ---------- Core totals ----------
-    # ---------- RAW bank totals (additive, no behavior change) ----------
-
-
     total_income = round(df_txn["deposit"].sum(), 2)
     total_expense = round(df_txn["withdrawal"].sum(), 2)
     net_cashflow = round(total_income - total_expense, 2)
+
+    # ---------- Safety invariant ----------
+    assert round(total_income - total_expense, 2) == net_cashflow, (
+        "Cashflow invariant violated"
+    )
 
     # ---------- Monthly cashflow ----------
     df_txn["month"] = df_txn["date"].dt.to_period("M")
@@ -78,6 +82,7 @@ def compute_metrics_from_df(df: pd.DataFrame):
         .to_dict(orient="records")
     )
 
+    # ---------- Metrics payload ----------
     metrics = {
         "total_income": total_income,
         "total_expense": total_expense,
