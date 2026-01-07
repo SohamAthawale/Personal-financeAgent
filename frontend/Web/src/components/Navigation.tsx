@@ -2,30 +2,37 @@ import React from 'react';
 import { LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
+/**
+ * Central page type (must match App.tsx)
+ */
+export type Page = 'dashboard' | 'analytics' | 'insights' | 'goals';
+
 interface NavigationProps {
-  currentPage: string;
-  onPageChange: (page: string) => void;
+  currentPage: Page;
+  onPageChange: (page: Page) => void;
 }
 
-export function Navigation({ currentPage, onPageChange }: NavigationProps) {
+export function Navigation({
+  currentPage,
+  onPageChange,
+}: NavigationProps) {
   const { logout, phone } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
-  const pages = [
+  const pages: { id: Page; label: string }[] = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'analytics', label: 'Analytics' },
     { id: 'insights', label: 'Insights' },
     { id: 'goals', label: 'Goals' },
   ];
 
-  const handlePageChange = (pageId: string) => {
+  const handlePageChange = (pageId: Page) => {
     onPageChange(pageId);
     setMobileMenuOpen(false);
   };
 
   const handleLogout = () => {
-    logout();
-    onPageChange('login');
+    logout(); // 🔐 Auth gate will redirect automatically
     setMobileMenuOpen(false);
   };
 
@@ -37,6 +44,7 @@ export function Navigation({ currentPage, onPageChange }: NavigationProps) {
             <h1 className="text-2xl font-bold text-blue-600">FA</h1>
           </div>
 
+          {/* Desktop menu */}
           <div className="hidden md:flex items-center gap-8">
             {pages.map((page) => (
               <button
@@ -53,6 +61,7 @@ export function Navigation({ currentPage, onPageChange }: NavigationProps) {
             ))}
           </div>
 
+          {/* Desktop user info */}
           <div className="hidden md:flex items-center gap-4">
             <span className="text-sm text-gray-600">{phone}</span>
             <button
@@ -64,6 +73,7 @@ export function Navigation({ currentPage, onPageChange }: NavigationProps) {
             </button>
           </div>
 
+          {/* Mobile menu toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden text-gray-600"
@@ -76,6 +86,7 @@ export function Navigation({ currentPage, onPageChange }: NavigationProps) {
           </button>
         </div>
 
+        {/* Mobile menu */}
         {mobileMenuOpen && (
           <div className="md:hidden pb-4 border-t border-gray-200">
             {pages.map((page) => (
@@ -91,6 +102,7 @@ export function Navigation({ currentPage, onPageChange }: NavigationProps) {
                 {page.label}
               </button>
             ))}
+
             <div className="border-t border-gray-200 mt-4 pt-4">
               <p className="px-4 text-sm text-gray-600 mb-2">{phone}</p>
               <button

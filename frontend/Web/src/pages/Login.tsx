@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,7 @@ interface LoginProps {
 
 export function Login({ onSignupClick }: LoginProps) {
   const { setPhone } = useAuth();
+
   const [phone, setPhoneLocal] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,13 +19,8 @@ export function Login({ onSignupClick }: LoginProps) {
     e.preventDefault();
     setError('');
 
-    if (!phone.trim()) {
-      setError('Phone number is required');
-      return;
-    }
-
-    if (!password.trim()) {
-      setError('Password is required');
+    if (!phone || !password) {
+      setError('Phone and password are required');
       return;
     }
 
@@ -32,21 +28,13 @@ export function Login({ onSignupClick }: LoginProps) {
       setLoading(true);
       await api.login(phone, password);
       setPhone(phone);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Login failed';
-      if (errorMsg.includes('password')) {
-        setError('Incorrect phone or password');
-      } else if (errorMsg.includes('not found')) {
-        setError('User not found. Create an account first.');
-      } else {
-        setError(errorMsg);
-      }
+    } catch {
+      setError('Incorrect phone or password');
     } finally {
       setLoading(false);
     }
   };
-
-  return (
+return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
@@ -73,7 +61,7 @@ export function Login({ onSignupClick }: LoginProps) {
               value={phone}
               onChange={(e) => setPhoneLocal(e.target.value)}
               placeholder="9999999999"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -86,7 +74,7 @@ export function Login({ onSignupClick }: LoginProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -95,19 +83,23 @@ export function Login({ onSignupClick }: LoginProps) {
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition text-lg"
           >
-            {loading ? 'Logging in...' : 'Log In'}
+            {loading ? 'Logging in…' : 'Log In'}
           </button>
         </form>
 
-        <p className="text-center text-gray-600 text-sm mt-6">
-          Don't have an account?{' '}
+        {/* ---------- Signup CTA ---------- */}
+        <div className="mt-6 text-center space-y-3">
+          <p className="text-gray-600 text-sm">
+            Don’t have an account?
+          </p>
+
           <button
             onClick={onSignupClick}
-            className="text-blue-600 hover:underline font-semibold"
+            className="w-full bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 font-semibold py-2 rounded-lg transition"
           >
-            Create one
+            Create an Account
           </button>
-        </p>
+        </div>
       </div>
     </div>
   );

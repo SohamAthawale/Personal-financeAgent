@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Onboarding } from './pages/Onboarding';
 import { Login } from './pages/Login';
@@ -10,22 +10,33 @@ import { Navigation } from './components/Navigation';
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
-  const [currentPage, setCurrentPage] = useState('dashboard');
-  const [showOnboarding, setShowOnboarding] = useState(true);
 
-  if (!isAuthenticated) {
-    if (showOnboarding) {
-      return (
-        <Onboarding />
-      );
-    } else {
-      return <Login onSignupClick={() => setShowOnboarding(true)} />;
+  const [currentPage, setCurrentPage] = useState<'dashboard' | 'analytics' | 'insights' | 'goals'>('dashboard');
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+
+  // ✅ FIX: Always land on Dashboard after login
+  useEffect(() => {
+    if (isAuthenticated) {
+      setCurrentPage('dashboard');
     }
+  }, [isAuthenticated]);
+
+  // 🔐 Auth Gate
+  if (!isAuthenticated) {
+    return authMode === 'signup' ? (
+      <Onboarding onBackToLogin={() => setAuthMode('login')} />
+    ) : (
+      <Login onSignupClick={() => setAuthMode('signup')} />
+    );
   }
 
   return (
     <>
-      <Navigation currentPage={currentPage} onPageChange={setCurrentPage} />
+      <Navigation
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+      />
+
       <main>
         {currentPage === 'dashboard' && <Dashboard />}
         {currentPage === 'analytics' && <Analytics />}
@@ -36,12 +47,10 @@ function AppContent() {
   );
 }
 
-function App() {
+export default function App() {
   return (
     <AuthProvider>
       <AppContent />
     </AuthProvider>
   );
 }
-
-export default App;
