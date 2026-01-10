@@ -37,7 +37,11 @@ export function Insights() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const loadInsights = async () => {
+  /* =======================
+     Loader
+     ======================= */
+
+  const loadInsights = async (refresh?: string) => {
     if (!phone) {
       setError('User phone not found');
       setLoading(false);
@@ -48,7 +52,7 @@ export function Insights() {
       setLoading(true);
       setError('');
 
-      const result = (await api.getInsights(phone)) as InsightsApiResponse;
+      const result = (await api.getInsights(phone, refresh)) as InsightsApiResponse;
 
       if (result.status !== 'success') {
         setError(result.message ?? 'Failed to load insights');
@@ -64,6 +68,10 @@ export function Insights() {
       setLoading(false);
     }
   };
+
+  /* =======================
+     Initial load (cached)
+     ======================= */
 
   useEffect(() => {
     loadInsights();
@@ -110,8 +118,9 @@ export function Insights() {
             </p>
           </div>
 
+          {/* 🔥 FIXED BUTTON */}
           <button
-            onClick={loadInsights}
+            onClick={() => loadInsights('all')}
             disabled={loading}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2 px-6 rounded-lg transition"
           >

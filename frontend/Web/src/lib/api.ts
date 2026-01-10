@@ -122,22 +122,31 @@ export const api = {
     return response.json();
   },
 
-  async getInsights(phone: string): Promise<InsightsApiResponse> {
-    const response = await fetch(
-      `${API_BASE}/api/statement/insights?phone=${phone}`,
-      {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+  async getInsights(
+  phone: string,
+  refresh?: string
+): Promise<InsightsApiResponse> {
+  const params = new URLSearchParams({ phone });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch insights');
+  if (refresh) {
+    params.append('refresh', refresh);
+  }
+
+  const response = await fetch(
+    `${API_BASE}/api/statement/insights?${params.toString()}`,
+    {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
     }
+  );
 
-    return response.json();
-  },
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to fetch insights');
+  }
+
+  return response.json();
+},
 
   async getRecommendations(
     phone: string,

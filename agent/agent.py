@@ -12,18 +12,6 @@ from agent.goal_engine import (
     goal_based_action
 )
 
-from datetime import date
-
-import agent.state_builder as state_builder
-from agent.forecast import forecast_month_end_balance
-from agent.policy import decide
-from agent.executor import execute
-
-from agent.goal_engine import (
-    evaluate_goal,
-    goal_based_action
-)
-
 
 def run_agent(df, metrics=None, goals=None):
     """
@@ -58,6 +46,32 @@ def run_agent(df, metrics=None, goals=None):
     responses = execute(actions, state)
 
     # ================================
+    # 🆕 STRUCTURED RECOMMENDATIONS
+    # ================================
+    recommendations = {
+        "critical": [],
+        "forecast": [],
+        "goals": []
+    }
+
+    # --- Map actions → critical / forecast buckets ---
+    for action in actions:
+        if action in ("reduce_spending", "emergency_mode", "pause_goals"):
+            recommendations["critical"].append({
+                "action": action,
+                "message": f"Immediate action required: {action.replace('_', ' ')}.",
+                "severity": "critical",
+                "confidence": 0.95
+            })
+        else:
+            recommendations["forecast"].append({
+                "action": action,
+                "message": f"Recommended action: {action.replace('_', ' ')}.",
+                "severity": "medium",
+                "confidence": 0.85
+            })
+
+    # ================================
     # 4️⃣ GOAL REASONING (USER-DEFINED)
     # ================================
     goal_evaluations = []
@@ -74,16 +88,29 @@ def run_agent(df, metrics=None, goals=None):
 
             responses.append(goal_action["message"])
 
+            # 🆕 Structured goal recommendation
+            recommendations["goals"].append({
+                "goal": getattr(goal, "name", "unknown"),
+                "message": goal_action["message"],
+                "action": goal_action["action"],
+                "severity": eval_result.get("severity", "info"),
+                "confidence": eval_result.get("confidence", 0.8)
+            })
+
     # ================================
     # 5️⃣ FINAL OUTPUT
     # ================================
     result = {
-            "state": state,
-            "forecast_balance": round(float(forecast_balance), 2),
-            "actions": sorted(set(actions)),
-            "responses": responses,
-            "goal_evaluations": goal_evaluations,
-        }
+        "state": state,
+        "forecast_balance": round(float(forecast_balance), 2),
 
-        # ✅ CRITICAL FIX
+        # 🔒 Keep existing fields
+        "actions": sorted(set(actions)),
+        "responses": list(dict.fromkeys(responses)),
+        "goal_evaluations": goal_evaluations,
+
+        # 🆕 New structured output
+        "recommendations": recommendations,
+    }
+
     return make_json_safe(result)
