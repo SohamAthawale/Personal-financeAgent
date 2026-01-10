@@ -44,7 +44,8 @@ def transactions_to_df(transactions) -> pd.DataFrame:
         amount = float(t.amount)
 
         rows.append(
-            {
+            {   
+                "id": t.id,
                 "date": t.date,
                 "description": t.description,
 
@@ -159,6 +160,35 @@ from analytics.categorization import (
 )
 from analytics.counterparty_analysis import upi_counterparty_summary
 
+from typing import Dict, Any, Optional
+from datetime import datetime
+from sqlalchemy.orm import Session
+
+from models import Transaction, Statement
+from analytics.metrics import compute_metrics_from_df
+from analytics.categorization import (
+    add_categories,
+    category_summary,
+    category_summary_all_debits,
+)
+from analytics.counterparty_analysis import upi_counterparty_summary
+
+from typing import Dict, Any, Optional
+from datetime import datetime
+from sqlalchemy.orm import Session
+
+from models import Transaction, Statement
+from pipeline.core import transactions_to_df
+
+from analytics.metrics import compute_metrics_from_df
+from analytics.categorization import (
+    add_categories,
+    category_summary,
+    category_summary_all_debits,
+)
+from analytics.counterparty_analysis import upi_counterparty_summary
+from analytics.merchant_normalizer import normalize_merchant
+
 
 def compute_analytics(
     *,
@@ -171,11 +201,11 @@ def compute_analytics(
     Deterministic financial analytics.
 
     Guarantees:
-    - Uses ONLY DB-persisted transactions
-    - No LLM involvement
+    - DB is the single source of truth
+    - LLM runs ONLY for uncategorized transactions
+    - Categorization is persisted (one-time)
     - Order-independent
     - Auditable & reproducible
-    - Time-window aware (monthly / rolling / full)
     """
 
     # --------------------------------------------------
@@ -213,12 +243,25 @@ def compute_analytics(
         }
 
     # --------------------------------------------------
-    # 3️⃣ Convert DB rows → analytics DataFrame
+    # 3️⃣ Convert DB rows → DataFrame
     # --------------------------------------------------
     df = transactions_to_df(txns)
 
     # --------------------------------------------------
-    # 4️⃣ Compute core metrics (GROUND TRUTH)
+    # 🔧 ALWAYS derive merchant + UPI metadata (NO LLM)
+    # --------------------------------------------------
+    merchant_data = df["description"].apply(normalize_merchant)
+
+    df["merchant"] = merchant_data.apply(
+        lambda x: (x.get("merchant_name") or "").upper()
+    )
+
+    df["upi_id"] = merchant_data.apply(
+        lambda x: x.get("upi_id")
+    )
+
+    # --------------------------------------------------
+    # 4️⃣ Core metrics (GROUND TRUTH)
     # --------------------------------------------------
     metrics, df_txn = compute_metrics_from_df(df)
 
@@ -236,9 +279,43 @@ def compute_analytics(
     assert abs(delta) < 0.01, "Cashflow invariant violated"
 
     # --------------------------------------------------
-    # 6️⃣ Categorization (pure transformation)
+    # 6️⃣ LAZY CATEGORIZATION (ONLY IF MISSING)
     # --------------------------------------------------
-    df_txn = add_categories(df_txn)
+    missing_mask = (
+        df_txn["category"].isna()
+        | (df_txn["category"] == "")
+    )
+
+    if missing_mask.any():
+        df_missing = df_txn[missing_mask].copy()
+
+        # 🔥 Rules + LLM pipeline
+        df_missing = add_categories(df_missing)
+
+        # Persist back to DB (ONE TIME)
+        txn_by_id = {t.id: t for t in txns}
+
+        for _, row in df_missing.iterrows():
+            txn = txn_by_id.get(row["id"])
+            if not txn:
+                continue
+
+            txn.category = row["category"]
+            txn.category_confidence = row["category_confidence"]
+            txn.category_source = row["category_source"]
+
+        db.commit()
+
+        # Merge results back
+        df_txn.loc[
+            missing_mask,
+            ["category", "category_confidence", "category_source"],
+        ] = df_missing[
+            ["category", "category_confidence", "category_source"]
+        ].values
+
+    # 🔐 Safety: analytics must never see uncategorized rows
+    assert not df_txn["category"].isna().any(), "Uncategorized txns remain"
 
     # --------------------------------------------------
     # 7️⃣ Aggregations
@@ -258,6 +335,7 @@ def compute_analytics(
         "transaction_count": int(len(df_txn)),
         "sum_deposits": round(float(df_txn["deposit"].sum()), 2),
         "sum_withdrawals": round(float(df_txn["withdrawal"].sum()), 2),
+        "llm_backfilled": int(missing_mask.sum()),
     }
 
     # --------------------------------------------------
@@ -395,8 +473,14 @@ def run_agent_view(*, db, user_id, goals=None):
     df = transactions_to_df(txns)
     metrics, df_txn = compute_metrics_from_df(df)
 
-    return run_agent(
+    agent_result = run_agent(
         df=df_txn,
         metrics=metrics,
         goals=goals
     )
+
+    # 🆕 Explicit success wrapper (non-breaking)
+    return {
+        "status": "success",
+        **agent_result
+    }

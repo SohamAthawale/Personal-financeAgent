@@ -5,6 +5,7 @@ import numpy as np
 import requests
 import time
 from typing import Any
+from threading import Lock
 
 # ==================================================
 # BACKEND CONFIG (SINGLE SOURCE OF TRUTH)
@@ -17,6 +18,13 @@ except ImportError:
     OLLAMA_URL = "http://localhost:11434/api/generate"
     LLM_MODEL = "llama3"
 
+# ==================================================
+# INTERNAL STATE
+# ==================================================
+_LLM_LOCK = Lock()
+_LAST_FAILURE_TS = 0.0
+_FAILURE_COOLDOWN = 30  # seconds
+
 
 # ==================================================
 # JSON SAFETY
@@ -26,30 +34,32 @@ def make_json_safe(obj: Any) -> Any:
     Recursively convert pandas / numpy / datetime objects
     into JSON-serializable primitives.
     """
+
     if isinstance(obj, dict):
         return {k: make_json_safe(v) for k, v in obj.items()}
 
     if isinstance(obj, list):
         return [make_json_safe(v) for v in obj]
 
+    # datetime, pandas Timestamp
     if hasattr(obj, "isoformat"):
         return obj.isoformat()
 
+    # pandas Period, etc.
     if hasattr(obj, "to_timestamp"):
         return str(obj)
 
-    if hasattr(obj, "item"):
-        return obj.item()
-    
-    if isinstance(obj, dict):
-        return {k: make_json_safe(v) for k, v in obj.items()}
-
-    if isinstance(obj, list):
-        return [make_json_safe(v) for v in obj]
-
+    # numpy scalar
     if isinstance(obj, np.generic):
-        return obj.item()  
-    
+        return obj.item()
+
+    # pandas scalar
+    if hasattr(obj, "item"):
+        try:
+            return obj.item()
+        except Exception:
+            pass
+
     return obj
 
 
@@ -64,48 +74,61 @@ def call_llm(
     """
     Centralized LLM call utility.
 
-    - Backend-only
+    Guarantees:
+    - Single-flight protection (per process)
     - Controlled retries
+    - Circuit breaker on repeated failure
     - Deterministic-friendly
-    - Safe fallback
     """
 
+    global _LAST_FAILURE_TS
+
     # -------------------------------
-    # Hard guard
+    # Hard guards
     # -------------------------------
     if not LLM_ENABLED:
         return "LLM disabled by server configuration."
 
+    now = time.time()
+    if now - _LAST_FAILURE_TS < _FAILURE_COOLDOWN:
+        return "⚠️ LLM temporarily unavailable. Using cached insights."
+
+    # Prevent pathological prompts
+    if len(prompt) > 12_000:
+        prompt = prompt[:12_000] + "\n\n[TRUNCATED FOR SAFETY]"
+
     # -------------------------------
-    # Retry-safe call
+    # Single-flight lock
     # -------------------------------
-    for attempt in range(1, max_retries + 1):
-        try:
-            response = requests.post(
-                OLLAMA_URL,
-                json={
-                    "model": LLM_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": float(temperature),
-                        "top_p": 0.9,
+    with _LLM_LOCK:
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = requests.post(
+                    OLLAMA_URL,
+                    json={
+                        "model": LLM_MODEL,
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {
+                            "temperature": float(temperature),
+                            "top_p": 0.9,
+                        },
                     },
-                },
-                timeout=90,
-            )
+                    timeout=60,
+                )
 
-            response.raise_for_status()
+                response.raise_for_status()
 
-            return response.json().get("response", "")
+                return response.json().get("response", "")
 
-        except requests.exceptions.ReadTimeout:
-            print(f"⏳ LLM timeout ({attempt}/{max_retries})")
-            time.sleep(2 * attempt)
+            except requests.exceptions.ReadTimeout:
+                print(f"⏳ LLM timeout ({attempt}/{max_retries})")
+                time.sleep(2 * attempt)
 
-        except Exception as e:
-            print(f"⚠️ LLM error: {e}")
-            break
+            except Exception as e:
+                print(f"⚠️ LLM error: {e}")
+                _LAST_FAILURE_TS = time.time()
+                break
 
     # -------------------------------
     # Graceful fallback
