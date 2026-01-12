@@ -1,6 +1,0 @@
-{
-  "fingerprint": "e218c1f89f9859173bf42504823a09c980ee90a255dc24e5008f544350a5baeb",
-  "transaction_count": 100,
-  "model": "llama3",
-  "content": "**New Patterns:**\n\n1. **Clustered Transactions:** A cluster of transactions is observed on dates [insert specific dates], with descriptions containing keywords like \"Purchase\" and \"Order\". This suggests that there may be a regular purchase or subscription activity.\n2. **Repeated Sent UPI:** Repeated instances of \"Sent UPI\" are found in transaction descriptions, indicating ongoing use of the Unified Payments Interface (UPI) for transactions.\n\n**No Material Changes:**\n\nThe previous insights remain valid, and no significant changes are observed in this new sample. The patterns of repeated transactions, frequent large payments, and recurring subscriptions continue to hold true.\n\nOverall, these findings suggest that the individual or organization continues to exhibit a high volume of transactions, with a focus on UPI-based payments and recurring subscriptions."
-}

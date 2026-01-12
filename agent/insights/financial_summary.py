@@ -1,9 +1,7 @@
 # agent/insights/financial_summary.py
 
 import json
-import hashlib
 from typing import Any, Dict
-from pathlib import Path
 
 # ==================================================
 # BACKEND CONFIG
@@ -16,13 +14,6 @@ except ImportError:
 
 from agent.insights.utils import make_json_safe, call_llm
 
-# ==================================================
-# CACHE CONFIG
-# ==================================================
-CACHE_DIR = Path(".cache/insights")
-CACHE_DIR.mkdir(parents=True, exist_ok=True)
-
-CACHE_FILE = CACHE_DIR / "financial_summary.json"
 
 # ==================================================
 # SYSTEM PROMPT (STRICT, METRIC-LOCKED)
@@ -39,34 +30,6 @@ STRICT RULES:
 
 
 # ==================================================
-# HELPERS
-# ==================================================
-def _fingerprint_metrics(metrics: Dict[str, Any]) -> str:
-    """
-    Stable fingerprint of authoritative metrics.
-    """
-    blob = json.dumps(
-        metrics,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    return hashlib.sha256(blob.encode()).hexdigest()
-
-
-def _load_cache() -> Dict[str, Any] | None:
-    if not CACHE_FILE.exists():
-        return None
-    try:
-        return json.loads(CACHE_FILE.read_text())
-    except Exception:
-        return None
-
-
-def _save_cache(payload: Dict[str, Any]) -> None:
-    CACHE_FILE.write_text(json.dumps(payload, indent=2))
-
-
-# ==================================================
 # FINANCIAL SUMMARY GENERATOR (BACKEND ONLY)
 # ==================================================
 def generate_financial_summary(
@@ -75,11 +38,9 @@ def generate_financial_summary(
     """
     Generates a qualitative financial summary.
 
-    Guarantees:
+    - Backend-only
     - Metrics are authoritative
-    - Cached if unchanged
-    - No delta reasoning
-    - Deterministic & auditable
+    - Safe to expose via API
     """
 
     # -------------------------------
@@ -89,35 +50,16 @@ def generate_financial_summary(
         return {
             "type": "llm_financial_summary",
             "model": None,
-            "content": "LLM disabled by server configuration.",
-            "cached": False,
+            "content": "LLM disabled by server configuration."
         }
 
     if not isinstance(metrics, dict):
         raise ValueError("metrics must be a dict")
 
-    if not metrics:
-        return {
-            "type": "llm_financial_summary",
-            "model": None,
-            "content": "No financial metrics available.",
-            "cached": False,
-        }
-
     # -------------------------------
-    # Fingerprint + cache lookup
+    # JSON-safe metrics
     # -------------------------------
     safe_metrics = make_json_safe(metrics)
-    fingerprint = _fingerprint_metrics(safe_metrics)
-
-    cache = _load_cache()
-    if cache and cache.get("fingerprint") == fingerprint:
-        return {
-            "type": "llm_financial_summary",
-            "model": cache.get("model"),
-            "content": cache.get("content"),
-            "cached": True,
-        }
 
     # -------------------------------
     # Prompt
@@ -137,7 +79,7 @@ If unsure, restate the provided totals.
 """
 
     # -------------------------------
-    # LLM Call
+    # LLM Call (via shared utility)
     # -------------------------------
     try:
         content = call_llm(
@@ -145,20 +87,10 @@ If unsure, restate the provided totals.
             temperature=0.05
         )
 
-        payload = {
-            "fingerprint": fingerprint,
-            "metrics": safe_metrics,
-            "model": LLM_MODEL,
-            "content": content,
-        }
-
-        _save_cache(payload)
-
         return {
             "type": "llm_financial_summary",
             "model": LLM_MODEL,
-            "content": content,
-            "cached": False,
+            "content": content
         }
 
     except Exception:
@@ -168,6 +100,5 @@ If unsure, restate the provided totals.
             "content": (
                 "Financial summary unavailable.\n"
                 "Authoritative metrics remain valid."
-            ),
-            "cached": False,
+            )
         }

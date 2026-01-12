@@ -7,23 +7,11 @@ from sqlalchemy.orm import Session
 
 from db import engine, SessionLocal
 from models import User
-# ================================
-# INSIGHTS DEPENDENCIES (REQUIRED)
-# ================================
-from models import Transaction, Statement
-
-from pipeline.core import transactions_to_df
-
-from analytics.metrics import compute_metrics_from_df
-from analytics.categorization import category_summary
-
-from agent.insights.financial_summary import generate_financial_summary
-from agent.insights.transaction_patterns import generate_transaction_patterns
-from agent.insights.category_insights import generate_category_insights
 
 from pipeline.core import (
     parse_statement,
     compute_analytics,
+    generate_insights_view,
     run_agent_view
 )
 from flask_cors import CORS
@@ -39,7 +27,6 @@ CORS(
     resources={r"/api/*": {"origins": [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "http://127.0.0.1:5713",
     ]}},
     methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
@@ -272,12 +259,11 @@ def analytics_route():
 
 
 # ==================================================
-# 4️⃣ INSIGHTS (UPDATED – PARTIAL REFRESH SUPPORT)
+# 4️⃣ INSIGHTS
 # ==================================================
 @app.route("/api/statement/insights", methods=["GET"])
 def insights_route():
     phone = request.args.get("phone")
-
     if not phone:
         return jsonify({"status": "error", "message": "phone is required"}), 400
 
@@ -287,70 +273,11 @@ def insights_route():
         if not user:
             return jsonify({"status": "error", "message": "User not found"}), 404
 
-        # --------------------------------------------------
-        # Reuse analytics (single source of truth)
-        # --------------------------------------------------
-        analytics = compute_analytics(db=db, user_id=user.id)
-
-        if analytics["status"] != "success":
-            return jsonify({
-                "status": "success",
-                "financial_summary": {
-                    "type": "system",
-                    "model": None,
-                    "content": "No data available yet."
-                },
-                "transaction_patterns": {
-                    "type": "system",
-                    "model": None,
-                    "content": "No data available yet."
-                },
-                "category_insights": {
-                    "type": "system",
-                    "model": None,
-                    "content": "No data available yet."
-                },
-            })
-
-        metrics = analytics["metrics"]
-        categories = analytics["categories"]
-
-        # --------------------------------------------------
-        # Build transaction sample (safe & minimal)
-        # --------------------------------------------------
-        txns = (
-            db.query(Transaction)
-            .join(Statement)
-            .filter(Statement.user_id == user.id)
-            .order_by(Transaction.date.desc())
-            .limit(100)
-            .all()
-        )
-
-        txn_sample = [
-            {
-                "date": t.date,
-                "description": t.description,
-                "category": t.category,
-            }
-            for t in txns
-        ]
-
-        # --------------------------------------------------
-        # Generate insights (NO refresh flags)
-        # --------------------------------------------------
-        return jsonify({
-            "status": "success",
-
-            "financial_summary": generate_financial_summary(metrics),
-
-            "transaction_patterns": generate_transaction_patterns(txn_sample),
-
-            "category_insights": generate_category_insights(categories),
-        })
-
+        result = generate_insights_view(db=db, user_id=user.id)
+        return jsonify(result)
     finally:
         db.close()
+
 
 # ==================================================
 # 5️⃣ AGENT RECOMMENDATIONS
