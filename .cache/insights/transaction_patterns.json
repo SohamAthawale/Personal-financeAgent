@@ -1,0 +1,6 @@
+{
+  "fingerprint": "1ee4b4e1844ac566db57bfd35b678b14555d8f47c0e703300674e133d74a3096",
+  "transaction_count": 2470,
+  "model": "qwen2.5:7b",
+  "content": "1. Unusual Timing or Clustering:\n   - The transactions are clustered around January 1, 2025, with multiple UPI transfers occurring on this single day. This suggests a pattern of frequent and repeated transactions on the same date.\n\n2. High-Level Behavioral Patterns:\n   - There is a frequent use of UPI (Unified Payments Interface) for both receiving and sending payments.\n   - The transactions are clustered around specific senders such as \"MAHENDRA KUMAR\" and \"JITENDRAKUMAR,\" indicating repeated interactions with these individuals or entities."
+}

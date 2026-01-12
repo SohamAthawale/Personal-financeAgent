@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { Loader, AlertCircle, Plus, X, Sparkles } from 'lucide-react';
+import {
+  Loader,
+  AlertCircle,
+  Plus,
+  X,
+  Sparkles,
+} from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Goal } from '../types';
@@ -8,10 +14,18 @@ import { Goal } from '../types';
    Local API response type
    ======================= */
 
+type StructuredRecommendation = {
+  message: string;
+  action?: string;
+  severity?: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  confidence?: number;
+};
+
 type RecommendationsApiResponse = {
   responses: string[];
   actions: string[];
   forecast_balance: number;
+
   goal_evaluations: Array<{
     goal: string;
     feasible: boolean;
@@ -19,6 +33,13 @@ type RecommendationsApiResponse = {
     required_monthly_saving: number;
     current_monthly_saving: number;
   }>;
+
+  recommendations?: {
+    critical?: StructuredRecommendation[];
+    forecast?: StructuredRecommendation[];
+    goals?: StructuredRecommendation[];
+  };
+
   state: {
     avg_monthly_income: number;
     avg_monthly_expense: number;
@@ -108,6 +129,37 @@ export function Goals() {
   };
 
   /* =======================
+     Render helpers
+     ======================= */
+
+  const renderBlock = (
+    title: string,
+    items?: StructuredRecommendation[],
+    color = 'gray'
+  ) => {
+    if (!items || items.length === 0) return null;
+
+    const colorMap: Record<string, string> = {
+      red: 'bg-red-50 border-red-200 text-red-700',
+      yellow: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+      green: 'bg-green-50 border-green-200 text-green-700',
+      blue: 'bg-blue-50 border-blue-200 text-blue-700',
+      gray: 'bg-gray-50 border-gray-200 text-gray-700',
+    };
+
+    return (
+      <div className={`border rounded-lg p-4 mb-4 ${colorMap[color]}`}>
+        <p className="font-semibold mb-2">{title}</p>
+        <ul className="list-disc pl-5 space-y-1">
+          {items.map((r, i) => (
+            <li key={i}>{r.message}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
+
+  /* =======================
      Render
      ======================= */
 
@@ -135,6 +187,7 @@ export function Goals() {
               Goals column
               ======================= */}
           <div>
+            {/* Create goal */}
             <div className="bg-white rounded-lg shadow-md p-6 mb-6">
               <h3 className="text-lg font-semibold mb-6">Create a Goal</h3>
 
@@ -195,6 +248,7 @@ export function Goals() {
               </div>
             </div>
 
+            {/* Goal list */}
             <div className="bg-white rounded-lg shadow-md p-6">
               <h3 className="text-lg font-semibold mb-4">
                 Your Goals ({goals.length})
@@ -249,12 +303,26 @@ export function Goals() {
                   AI Recommendations
                 </h3>
 
-                <ul className="list-disc pl-5 space-y-2 text-gray-700">
-                  {recommendations.responses.map((r, idx) => (
-                    <li key={idx}>{r}</li>
-                  ))}
-                </ul>
+                {/* NEW structured recommendations */}
+                {renderBlock(
+                  'Critical alerts',
+                  recommendations.recommendations?.critical,
+                  'red'
+                )}
 
+                {renderBlock(
+                  'Forecast insights',
+                  recommendations.recommendations?.forecast,
+                  'yellow'
+                )}
+
+                {renderBlock(
+                  'Goal insights',
+                  recommendations.recommendations?.goals,
+                  'green'
+                )}
+
+                {/* Goal evaluation math (unchanged) */}
                 {recommendations.goal_evaluations.map((g, idx) => (
                   <div key={idx} className="mt-4 text-sm">
                     {!g.feasible && (

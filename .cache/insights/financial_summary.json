@@ -1,0 +1,65 @@
+{
+  "fingerprint": "dc49a046eaad15be428fa33d43f2202e4a868e725c5c5527d641627b2ef7fe5e",
+  "metrics": {
+    "total_income": 332499.73,
+    "total_expense": 333479.37,
+    "net_cashflow": -979.64,
+    "monthly_cashflow": [
+      {
+        "month": "2024-12",
+        "amount": -330.0
+      },
+      {
+        "month": "2025-01",
+        "amount": 17250.869999999995
+      },
+      {
+        "month": "2025-02",
+        "amount": -14808.190000000002
+      },
+      {
+        "month": "2025-03",
+        "amount": -3008.220000000001
+      },
+      {
+        "month": "2025-04",
+        "amount": 2317.3199999999997
+      },
+      {
+        "month": "2025-05",
+        "amount": 2264.09
+      },
+      {
+        "month": "2025-06",
+        "amount": -4673.629999999999
+      },
+      {
+        "month": "2025-07",
+        "amount": 9536.220000000001
+      },
+      {
+        "month": "2025-08",
+        "amount": -8793.96
+      },
+      {
+        "month": "2025-09",
+        "amount": 2139.7000000000007
+      },
+      {
+        "month": "2025-10",
+        "amount": -2142.1899999999987
+      },
+      {
+        "month": "2025-11",
+        "amount": 2523.0
+      },
+      {
+        "month": "2025-12",
+        "amount": -3254.6500000000015
+      }
+    ],
+    "avg_confidence": 1.0
+  },
+  "model": "qwen2.5:7b",
+  "content": "1. **Income, Expense, Net Cashflow Summary:**\n   - Total Income: 332499.73\n   - Total Expense: 333479.37\n   - Net Cashflow: -979.64\n\n2. **Cashflow Health:** Low"
+}
