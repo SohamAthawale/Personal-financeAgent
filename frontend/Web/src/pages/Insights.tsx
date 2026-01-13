@@ -37,7 +37,11 @@ export function Insights() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const loadInsights = async () => {
+  /* =======================
+     Load insights
+     ======================= */
+
+  const loadInsights = async (forceRefresh = false) => {
     if (!phone) {
       setError('User phone not found');
       setLoading(false);
@@ -48,7 +52,10 @@ export function Insights() {
       setLoading(true);
       setError('');
 
-      const result = (await api.getInsights(phone)) as InsightsApiResponse;
+      const result = (await api.getInsights(
+        phone,
+        forceRefresh
+      )) as InsightsApiResponse;
 
       if (result.status !== 'success') {
         setError(result.message ?? 'Failed to load insights');
@@ -65,8 +72,12 @@ export function Insights() {
     }
   };
 
+  /* =======================
+     Initial load (soft)
+     ======================= */
+
   useEffect(() => {
-    loadInsights();
+    loadInsights(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phone]);
 
@@ -110,8 +121,9 @@ export function Insights() {
             </p>
           </div>
 
+          {/* 🔄 HARD REFRESH BUTTON */}
           <button
-            onClick={loadInsights}
+            onClick={() => loadInsights(true)}
             disabled={loading}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2 px-6 rounded-lg transition"
           >

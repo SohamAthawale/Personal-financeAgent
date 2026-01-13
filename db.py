@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
-DATABASE_URL = "postgresql+psycopg2://postgres:222003@localhost:5432/finance_agent"
+DATABASE_URL = "postgresql+psycopg2://finance_user@localhost:5432/finance_agent"
 
 
 

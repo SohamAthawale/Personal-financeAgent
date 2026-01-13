@@ -1,65 +1,87 @@
 {
-  "fingerprint": "dc49a046eaad15be428fa33d43f2202e4a868e725c5c5527d641627b2ef7fe5e",
+  "fingerprint": "b27dd22c06c3aa545c9d29d36e44591c2d48afc2c67afe351f948c0d6b42e369",
   "metrics": {
-    "total_income": 332499.73,
-    "total_expense": 333479.37,
-    "net_cashflow": -979.64,
+    "total_income": 88659.05,
+    "total_expense": 82646.7,
+    "net_cashflow": 6012.35,
     "monthly_cashflow": [
       {
-        "month": "2024-12",
-        "amount": -330.0
-      },
-      {
-        "month": "2025-01",
-        "amount": 17250.869999999995
-      },
-      {
-        "month": "2025-02",
-        "amount": -14808.190000000002
-      },
-      {
-        "month": "2025-03",
-        "amount": -3008.220000000001
-      },
-      {
-        "month": "2025-04",
-        "amount": 2317.3199999999997
-      },
-      {
-        "month": "2025-05",
-        "amount": 2264.09
-      },
-      {
-        "month": "2025-06",
-        "amount": -4673.629999999999
-      },
-      {
-        "month": "2025-07",
-        "amount": 9536.220000000001
-      },
-      {
-        "month": "2025-08",
-        "amount": -8793.96
-      },
-      {
-        "month": "2025-09",
-        "amount": 2139.7000000000007
-      },
-      {
         "month": "2025-10",
-        "amount": -2142.1899999999987
+        "amount": 10.0
       },
       {
         "month": "2025-11",
-        "amount": 2523.0
+        "amount": 7569.0
       },
       {
         "month": "2025-12",
-        "amount": -3254.6500000000015
+        "amount": -1540.6500000000015
+      },
+      {
+        "month": "2026-01",
+        "amount": -26.0
       }
     ],
-    "avg_confidence": 1.0
+    "avg_confidence": 0.996,
+    "top_upi_counterparties": [
+      {
+        "upi_id": "ARUNDHATI CHAIT_392351811296",
+        "transaction_count": 3,
+        "total_amount": 18450.0
+      },
+      {
+        "upi_id": "CHAITANYA PRAKA_570026931076",
+        "transaction_count": 3,
+        "total_amount": 15600.0
+      },
+      {
+        "upi_id": "SOHAMATHAWALE20_533409783240",
+        "transaction_count": 3,
+        "total_amount": 9384.0
+      },
+      {
+        "upi_id": "CHAITANYA PRAKA_567728319627",
+        "transaction_count": 3,
+        "total_amount": 9000.0
+      },
+      {
+        "upi_id": "LIFE STYLE INTE_693974695701",
+        "transaction_count": 3,
+        "total_amount": 9000.0
+      },
+      {
+        "upi_id": "SOHAMATHAWALE20_531074118261",
+        "transaction_count": 3,
+        "total_amount": 9000.0
+      },
+      {
+        "upi_id": "ARUNDHATI CHAIT_391720726072",
+        "transaction_count": 3,
+        "total_amount": 7500.0
+      },
+      {
+        "upi_id": "SOHAMATHAWALE20_571967941956",
+        "transaction_count": 1,
+        "total_amount": 5500.0
+      },
+      {
+        "upi_id": "ARUNDHATI CHAIT_392993845599",
+        "transaction_count": 3,
+        "total_amount": 4500.0
+      },
+      {
+        "upi_id": "SOHAMATHAWALE20_531048932301",
+        "transaction_count": 3,
+        "total_amount": 4500.0
+      }
+    ],
+    "_audit": {
+      "transaction_count": 573,
+      "sum_deposits": 88659.05,
+      "sum_withdrawals": 82646.7,
+      "llm_backfilled": 0
+    }
   },
-  "model": "qwen2.5:7b",
-  "content": "1. **Income, Expense, Net Cashflow Summary:**\n   - Total Income: 332499.73\n   - Total Expense: 333479.37\n   - Net Cashflow: -979.64\n\n2. **Cashflow Health:** Low"
+  "model": "llama3",
+  "content": "Based on the provided metrics, here are the requested summaries:\n\n**Income, Expense, Net Cashflow Summary**\n\n* Total income: 88659.05\n* Total expense: 82646.7\n* Net cash flow: 6012.35\n\n**Cashflow Health**\n\nThe net cash flow is positive (6012.35), indicating a High level of cash flow health.\n\nNote: I have only used the provided metrics and restated totals verbatim, without computing or inferring any numbers."
 }

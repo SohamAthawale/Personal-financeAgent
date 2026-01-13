@@ -1,35 +1,35 @@
 {
-  "fingerprint": "9904cf5dd6c7408eda1b914587ee3756a5313df15ac42c05100d84d46a40badc",
+  "fingerprint": "532e6894e4b23f08bff77ddb00f7667eac89cbc72a073d8c0aeac26bc20f1b21",
   "category_summary": [
     {
       "category": "Misc Businesses",
-      "expense": 104529.22
-    },
-    {
-      "category": "Food",
-      "expense": 37192.14
+      "expense": 17191.68
     },
     {
       "category": "Shopping",
-      "expense": 5953.0
+      "expense": 11163.0
+    },
+    {
+      "category": "Food",
+      "expense": 7847.02
     },
     {
       "category": "Investments/Mandates",
-      "expense": 5500.0
-    },
-    {
-      "category": "Bills",
-      "expense": 3824.0
+      "expense": 3500.0
     },
     {
       "category": "Transport",
-      "expense": 2786.0
+      "expense": 504.0
+    },
+    {
+      "category": "Bills",
+      "expense": 109.0
     },
     {
       "category": "Medical",
-      "expense": 1613.0
+      "expense": 58.0
     }
   ],
-  "model": "qwen2.5:7b",
-  "content": "Based on the provided category totals:\n\n1. **Top Spending Categories:**\n   - \"Misc Businesses\" with an expense of $104,529.22\n   - \"Food\" with an expense of $37,192.14\n\n2. **Discretionary vs Fixed Categories:**\n   - Discretionary:\n     - \"Shopping\" ($5,953.00)\n     - \"Investments/Mandates\" ($5,500.00)\n     - \"Food\" ($37,192.14) (while this is a necessity, it can be managed more closely to avoid overspending)\n   - Fixed:\n     - \"Bills\" ($3,824.00)\n     - \"Transport\" ($2,786.00)\n     - \"Medical\" ($1,613.00)\n     - \"Misc Businesses\" (This category can be complex and may include both fixed and discretionary expenses)\n\n3. **One Practical Optimization Suggestion:**\n   Given that \"Food\" is a significant portion of the spending at $37,192.14, one practical optimization suggestion would be to review and manage food expenses more closely. This could involve:\n   - Setting a budget for groceries and dining out.\n   - Planning meals in advance to avoid impulse purchases.\n   - Utilizing coupons or discounts where available.\n\nBy focusing on reducing unnecessary spending in the \"Food\" category, you can potentially reallocate those funds towards other areas of importance or savings."
+  "model": "llama3",
+  "content": "Based on the category totals, here are my findings:\n\n**Top Spending Categories:**\n\n1. \"Misc Businesses\" - $17,191.68 (most expensive category)\n2. \"Shopping\" - $11,163.00\n3. \"Food\" - $7,847.02\n\n**Discretionary vs Fixed Categories:**\n\n* Discretionary categories:\n\t+ \"Misc Businesses\"\n\t+ \"Shopping\"\n\t+ \"Food\"\n* Fixed categories:\n\t+ \"Investments/Mandates\" (likely a fixed expense)\n\t+ \"Transport\" (likely a fixed expense)\n\t+ \"Bills\" (likely a fixed expense)\n\t+ \"Medical\" (likely a fixed expense)\n\n**Practical Optimization Suggestion:**\n\nConsidering the top spending categories are discretionary, one practical optimization suggestion would be to review and optimize expenses in these categories. For example:\n\n* \"Misc Businesses\": Are there any unnecessary or redundant expenses that can be eliminated?\n* \"Shopping\": Can you identify areas where you can reduce spending without sacrificing essential items?\n\nBy focusing on optimizing discretionary expenses, you may be able to free up funds for more important goals or savings."
 }

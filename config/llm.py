@@ -13,5 +13,5 @@ OLLAMA_URL = os.getenv(
 # Model name
 LLM_MODEL = os.getenv(
     "LLM_MODEL",
-    "qwen2.5:7b"
+    "llama3"
 )

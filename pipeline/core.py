@@ -372,13 +372,7 @@ from typing import Dict, Any
 from sqlalchemy.orm import Session
 
 from models import Transaction, Statement
-from analytics.metrics import compute_metrics_from_df
-from analytics.categorization import (
-    add_categories,
-    category_summary,
-)
-from pipeline.core import transactions_to_df
-
+from pipeline.core import compute_analytics
 
 from agent.insights.financial_summary import generate_financial_summary
 from agent.insights.transaction_patterns import generate_transaction_patterns
@@ -388,70 +382,102 @@ from agent.insights.category_insights import generate_category_insights
 def generate_insights_view(
     *,
     db: Session,
-    user_id: int
+    user_id: int,
+    force_refresh: bool = False
 ) -> Dict[str, Any]:
     """
-    Generate LLM-based financial insights for a user.
+    Generate LLM-based insights STRICTLY from analytics output.
 
-    Safe behavior:
-    - If user has no transactions → return graceful `no_data` response
-    - Never raises on empty datasets
+    Behavior:
+    - force_refresh=True  → hard refresh (bypass all insight caches)
+    - force_refresh=False → normal cached behavior
+
+    Guarantees:
+    - compute_analytics is the ONLY source of truth
+    - No recomputation of metrics
+    - No re-categorization
+    - LLM used only for explanation, never for math
     """
 
     # --------------------------------------------------
-    # Fetch user transactions
+    # 1️⃣ Authoritative analytics (single engine)
     # --------------------------------------------------
-    txns = (
-        db.query(Transaction)
-        .join(Statement)
-        .filter(Statement.user_id == user_id)
-        .all()
+    analytics = compute_analytics(
+        db=db,
+        user_id=user_id
     )
 
     # --------------------------------------------------
-    # Graceful empty state (IMPORTANT)
+    # 2️⃣ Graceful empty / no-data handling
     # --------------------------------------------------
-    if not txns:
+    if analytics["status"] != "success":
         return {
-            "status": "no_data",
-            "message": "No transactions found. Upload a bank statement to generate insights.",
+            "status": analytics["status"],
+            "message": analytics.get(
+                "message",
+                "No data available for insights."
+            ),
             "financial_summary": None,
             "transaction_patterns": None,
             "category_insights": None,
         }
 
-    # --------------------------------------------------
-    # Convert to DataFrame
-    # --------------------------------------------------
-    df = transactions_to_df(txns)
+    metrics = analytics["metrics"]
+    categories = analytics["categories"]
 
     # --------------------------------------------------
-    # Metrics (guaranteed non-empty here)
+    # 3️⃣ Lightweight transaction sample (patterns ONLY)
     # --------------------------------------------------
-    metrics, _ = compute_metrics_from_df(df)
+    txns_sample = (
+        db.query(
+            Transaction.date,
+            Transaction.description,
+            Transaction.merchant,
+            Transaction.amount,
+            Transaction.category,
+        )
+        .join(Statement)
+        .filter(Statement.user_id == user_id)
+        .order_by(Transaction.date.desc())
+        .limit(50)
+        .all()
+    )
+
+    transaction_patterns_input = [
+        {
+            "date": t.date,
+            "description": t.description,
+            "merchant": t.merchant,
+            "amount": float(t.amount),
+            "category": t.category,
+        }
+        for t in txns_sample
+    ]
 
     # --------------------------------------------------
-    # Categorization
-    # --------------------------------------------------
-    df = add_categories(df)
-
-    # --------------------------------------------------
-    # LLM Insights
+    # 4️⃣ LLM = explanation layer ONLY
     # --------------------------------------------------
     return {
         "status": "success",
 
-        "financial_summary": generate_financial_summary(metrics),
-
-        "transaction_patterns": generate_transaction_patterns(
-            df[["date", "description"]].to_dict(orient="records")
+        # 🔒 Uses authoritative metrics only
+        "financial_summary": generate_financial_summary(
+            metrics,
+            force_refresh=force_refresh
         ),
 
+        # 🔒 Uses authoritative category totals
         "category_insights": generate_category_insights(
-            category_summary(df).to_dict(orient="records")
+            categories,
+            force_refresh=force_refresh
+        ),
+
+        # 🔒 Pattern-only, no math
+        "transaction_patterns": generate_transaction_patterns(
+            transaction_patterns_input,
+            force_refresh=force_refresh
         ),
     }
-
 
 # ==================================================
 # 4️⃣ AGENT

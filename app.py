@@ -265,6 +265,8 @@ def analytics_route():
 @app.route("/api/statement/insights", methods=["GET"])
 def insights_route():
     phone = request.args.get("phone")
+    force_refresh = request.args.get("force_refresh") == "true"
+
     if not phone:
         return jsonify({"status": "error", "message": "phone is required"}), 400
 
@@ -274,10 +276,16 @@ def insights_route():
         if not user:
             return jsonify({"status": "error", "message": "User not found"}), 404
 
-        result = generate_insights_view(db=db, user_id=user.id)
+        result = generate_insights_view(
+            db=db,
+            user_id=user.id,
+            force_refresh=force_refresh
+        )
         return jsonify(result)
+
     finally:
         db.close()
+
 
 
 # ==================================================

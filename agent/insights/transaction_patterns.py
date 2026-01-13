@@ -94,15 +94,20 @@ def _save_cache(payload: Dict[str, Any]) -> None:
 # TRANSACTION PATTERN ANALYZER (BACKEND ONLY)
 # ==================================================
 def generate_transaction_patterns(
-    transactions: List[Dict[str, Any]]
+    transactions: List[Dict[str, Any]],
+    *,
+    force_refresh: bool = False
 ) -> Dict[str, Any]:
     """
     Generates qualitative transaction pattern insights.
 
+    Behavior:
+    - force_refresh=True  → bypass cache, full recompute
+    - force_refresh=False → use cache + delta updates
+
     Guarantees:
-    - Uses cached insights if data unchanged
-    - Uses delta update if data grows
-    - Never recomputes unnecessarily
+    - No numeric inference
+    - Deterministic fingerprinting
     """
 
     # -------------------------------
@@ -133,7 +138,11 @@ def generate_transaction_patterns(
     fingerprint = _fingerprint_transactions(transactions)
     cache = _load_cache()
 
-    if cache and cache.get("fingerprint") == fingerprint:
+    if (
+        not force_refresh
+        and cache
+        and cache.get("fingerprint") == fingerprint
+    ):
         return {
             "type": "llm_transaction_patterns",
             "model": cache.get("model"),
@@ -142,35 +151,17 @@ def generate_transaction_patterns(
         }
 
     # -------------------------------
-    # Delta logic (NEW DATA ONLY)
+    # Delta logic (disabled on hard refresh)
     # -------------------------------
     previous_content = None
     previous_count = 0
 
-    if cache:
+    if cache and not force_refresh:
         previous_content = cache.get("content")
         previous_count = cache.get("transaction_count", 0)
 
-    new_txns = transactions[previous_count:]
-    safe_new_txns = make_json_safe(new_txns[:15])
-
-    # -------------------------------
-    # Prompt (delta-aware)
-    # -------------------------------
-    if previous_content:
-        prompt = f"""
-{SYSTEM_PROMPT}
-
-PREVIOUS_INSIGHT:
-{previous_content}
-
-NEW_TRANSACTION_SAMPLE (PATTERN ONLY):
-{json.dumps(safe_new_txns, indent=2)}
-
-Update the insight considering ONLY new patterns.
-If nothing materially changed, say so.
-"""
-    else:
+    # Hard refresh → full sample
+    if force_refresh or not previous_content:
         safe_txn = make_json_safe(transactions[:15])
         prompt = f"""
 {SYSTEM_PROMPT}
@@ -183,6 +174,22 @@ Answer:
 2. Any high-level behavioral patterns?
 
 Do NOT invent numbers.
+"""
+    else:
+        new_txns = transactions[previous_count:]
+        safe_new_txns = make_json_safe(new_txns[:15])
+
+        prompt = f"""
+{SYSTEM_PROMPT}
+
+PREVIOUS_INSIGHT:
+{previous_content}
+
+NEW_TRANSACTION_SAMPLE (PATTERN ONLY):
+{json.dumps(safe_new_txns, indent=2)}
+
+Update the insight considering ONLY new patterns.
+If nothing materially changed, say so.
 """
 
     # -------------------------------

@@ -70,15 +70,20 @@ def _save_cache(payload: Dict[str, Any]) -> None:
 # FINANCIAL SUMMARY GENERATOR (BACKEND ONLY)
 # ==================================================
 def generate_financial_summary(
-    metrics: Dict[str, Any]
+    metrics: Dict[str, Any],
+    *,
+    force_refresh: bool = False
 ) -> Dict[str, Any]:
     """
     Generates a qualitative financial summary.
 
+    Behavior:
+    - force_refresh=True  → bypass cache, regenerate insight
+    - force_refresh=False → use cache if fingerprint unchanged
+
     Guarantees:
     - Metrics are authoritative
-    - Cached if unchanged
-    - No delta reasoning
+    - No numeric inference by LLM
     - Deterministic & auditable
     """
 
@@ -111,7 +116,11 @@ def generate_financial_summary(
     fingerprint = _fingerprint_metrics(safe_metrics)
 
     cache = _load_cache()
-    if cache and cache.get("fingerprint") == fingerprint:
+    if (
+        not force_refresh
+        and cache
+        and cache.get("fingerprint") == fingerprint
+    ):
         return {
             "type": "llm_financial_summary",
             "model": cache.get("model"),

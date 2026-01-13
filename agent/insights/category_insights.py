@@ -37,7 +37,6 @@ STRICT RULES:
 - Identify dominant categories and risk
 """
 
-
 # ==================================================
 # HELPERS
 # ==================================================
@@ -81,15 +80,16 @@ def _save_cache(payload: Dict[str, Any]) -> None:
 # CATEGORY INSIGHT GENERATOR (BACKEND ONLY)
 # ==================================================
 def generate_category_insights(
-    category_summary: List[Dict[str, Any]]
+    category_summary: List[Dict[str, Any]],
+    *,
+    force_refresh: bool = False
 ) -> Dict[str, Any]:
     """
     Generates qualitative category-level insights.
 
-    Guarantees:
-    - Uses cached insights if unchanged
-    - Incrementally updates insight on category changes
-    - Category totals remain authoritative
+    Behavior:
+    - force_refresh=True  → bypass cache, recompute insight
+    - force_refresh=False → use cache if fingerprint unchanged
     """
 
     # -------------------------------
@@ -120,7 +120,11 @@ def generate_category_insights(
     fingerprint = _fingerprint_categories(category_summary)
     cache = _load_cache()
 
-    if cache and cache.get("fingerprint") == fingerprint:
+    if (
+        not force_refresh
+        and cache
+        and cache.get("fingerprint") == fingerprint
+    ):
         return {
             "type": "llm_category_insight",
             "model": cache.get("model"),
@@ -139,7 +143,7 @@ def generate_category_insights(
     # -------------------------------
     # Prompt (delta-aware)
     # -------------------------------
-    if previous_summary and previous_content:
+    if previous_summary and previous_content and not force_refresh:
         prompt = f"""
 {SYSTEM_PROMPT}
 
