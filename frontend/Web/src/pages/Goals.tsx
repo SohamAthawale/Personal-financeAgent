@@ -69,7 +69,7 @@ type RecommendationsApiResponse = {
    ======================= */
 
 export function Goals() {
-  const { phone } = useAuth();
+  const { auth } = useAuth();
 
   const [goals, setGoals] = useState<Goal[]>([]);
   const [recommendations, setRecommendations] =
@@ -91,13 +91,13 @@ export function Goals() {
      ======================= */
 
   useEffect(() => {
-    if (!phone) return;
+    if (!auth) return;
 
     api
-      .getGoals(phone)
+      .getGoals(auth.token)
       .then((res) => setGoals(res.goals))
       .catch(() => setError('Failed to load goals'));
-  }, [phone]);
+  }, [auth]);
 
   /* =======================
      Safe goal evaluations
@@ -119,7 +119,7 @@ export function Goals() {
      ======================= */
 
   const handleAddGoal = async () => {
-    if (!phone) return;
+    if (!auth) return;
 
     if (
       !newGoal.name.trim() ||
@@ -136,8 +136,8 @@ export function Goals() {
     }
 
     try {
-      await api.createGoals(phone, [newGoal]);
-      const refreshed = await api.getGoals(phone);
+      await api.createGoals(auth.token, [newGoal]);
+      const refreshed = await api.getGoals(auth.token);
       setGoals(refreshed.goals);
       setNewGoal({
         name: '',
@@ -156,10 +156,10 @@ export function Goals() {
      ======================= */
 
   const handleDeleteGoal = async (goalId: number) => {
-    if (!phone) return;
+    if (!auth) return;
 
     try {
-      await api.deleteGoal(phone, goalId);
+      await api.deleteGoal(auth.token, goalId);
       setGoals((prev) => prev.filter((g) => g.id !== goalId));
     } catch {
       setError('Failed to delete goal');
@@ -171,11 +171,11 @@ export function Goals() {
      ======================= */
 
   const handleGetRecommendations = async () => {
-    if (!phone) return;
+    if (!auth) return;
 
     try {
       setLoading(true);
-      const res = await api.getRecommendations(phone);
+      const res = await api.getRecommendations(auth.token);
       setRecommendations(res);
       setMetrics(res.metrics ?? null);
       setError('');
@@ -189,6 +189,14 @@ export function Goals() {
   /* =======================
      Render
      ======================= */
+
+  if (!auth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-slate-500">Please log in to view goals.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 p-8">
@@ -208,9 +216,7 @@ export function Goals() {
         )}
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          {/* =======================
-              LEFT – Goals
-              ======================= */}
+          {/* LEFT – Goals */}
           <div className="xl:col-span-1 space-y-6">
             {/* Create Goal */}
             <div className="bg-white p-6 rounded-xl shadow-sm">
@@ -289,9 +295,7 @@ export function Goals() {
             </div>
           </div>
 
-          {/* =======================
-              RIGHT – Analytics & AI
-              ======================= */}
+          {/* RIGHT – Analytics & AI */}
           <div className="xl:col-span-2 space-y-6">
             <button
               onClick={handleGetRecommendations}

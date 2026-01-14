@@ -12,9 +12,15 @@ export interface AuthResponse {
 }
 
 export interface LoginResponse {
-  status: string;
+  status: 'success';
+  access_token: string;
+  user: {
+    id: number;
+    email: string;
+  };
   message?: string;
 }
+
 
 export interface AnalyticsData {
   status: string;

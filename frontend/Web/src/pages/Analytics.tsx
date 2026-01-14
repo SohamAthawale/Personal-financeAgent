@@ -29,7 +29,7 @@ type AnalyticsApiResponse = {
    ======================= */
 
 export function Analytics() {
-  const { phone } = useAuth();
+  const { auth } = useAuth();
 
   const [filterType, setFilterType] = useState<FilterType>('period');
   const [selectedMonth, setSelectedMonth] = useState(
@@ -41,14 +41,19 @@ export function Analytics() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  /* =======================
+     Load analytics
+     ======================= */
+
   useEffect(() => {
+    if (!auth?.token) return;
     loadAnalytics();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterType, selectedMonth, selectedPeriod]);
+  }, [auth, filterType, selectedMonth, selectedPeriod]);
 
   const loadAnalytics = async () => {
-    if (!phone) {
-      setError('User phone not found');
+    if (!auth?.token) {
+      setError('You must be logged in to view analytics');
       return;
     }
 
@@ -62,7 +67,7 @@ export function Analytics() {
           : { period: selectedPeriod };
 
       const result = (await api.getAnalytics(
-        phone,
+        auth.token,
         params
       )) as AnalyticsApiResponse;
 
@@ -101,6 +106,20 @@ export function Analytics() {
       : null;
 
   /* =======================
+     Render guards
+     ======================= */
+
+  if (!auth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-slate-500">
+          Please log in to view analytics.
+        </p>
+      </div>
+    );
+  }
+
+  /* =======================
      Render
      ======================= */
 
@@ -108,7 +127,9 @@ export function Analytics() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Analytics</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            Analytics
+          </h1>
           <p className="text-gray-600">
             View your spending patterns and financial overview
           </p>
@@ -192,7 +213,9 @@ export function Analytics() {
 
             {Object.keys(analytics.categories).length > 0 && (
               <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="font-semibold mb-4">Spending by Category</h3>
+                <h3 className="font-semibold mb-4">
+                  Spending by Category
+                </h3>
                 {Object.entries(analytics.categories).map(([k, v]) => (
                   <div key={k} className="flex justify-between mb-2">
                     <span>{k}</span>

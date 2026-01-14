@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import { Upload, AlertCircle, CheckCircle, FileText, Loader } from 'lucide-react';
+import {
+  Upload,
+  AlertCircle,
+  CheckCircle,
+  Loader,
+} from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -11,13 +16,18 @@ interface UploadStatus {
 }
 
 export function Dashboard() {
-  const { phone } = useAuth();
+  const { auth } = useAuth();
+
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>({
     status: 'idle',
     progress: 0,
     message: '',
   });
   const [dragActive, setDragActive] = useState(false);
+
+  /* =======================
+     Upload handler
+     ======================= */
 
   const handleFile = async (file: File) => {
     if (!file.type.includes('pdf')) {
@@ -29,11 +39,11 @@ export function Dashboard() {
       return;
     }
 
-    if (!phone) {
+    if (!auth?.token) {
       setUploadStatus({
         status: 'error',
         progress: 0,
-        message: 'User phone not found',
+        message: 'You must be logged in to upload a statement',
       });
       return;
     }
@@ -45,18 +55,24 @@ export function Dashboard() {
         message: 'Uploading and parsing statement...',
       });
 
-      const result = await api.uploadStatement(file, phone, (progress) => {
-        setUploadStatus((prev) => ({
-          ...prev,
-          progress: Math.round(progress),
-        }));
-      });
+      const result = await api.uploadStatement(
+        file,
+        auth.token,
+        (progress) => {
+          setUploadStatus((prev) => ({
+            ...prev,
+            progress: Math.round(progress),
+          }));
+        }
+      );
 
       if (result.status === 'success') {
         setUploadStatus({
           status: 'success',
           progress: 100,
-          message: `Successfully parsed ${result.transactions_count || 0} transactions`,
+          message: `Successfully parsed ${
+            result.transactions_count || 0
+          } transactions`,
           transactionCount: result.transactions_count,
         });
 
@@ -79,10 +95,16 @@ export function Dashboard() {
         status: 'error',
         progress: 0,
         message:
-          err instanceof Error ? err.message : 'An error occurred during upload',
+          err instanceof Error
+            ? err.message
+            : 'An error occurred during upload',
       });
     }
   };
+
+  /* =======================
+     Drag & drop handlers
+     ======================= */
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -111,11 +133,27 @@ export function Dashboard() {
     }
   };
 
+  /* =======================
+     Render
+     ======================= */
+
+  if (!auth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-slate-500">
+          Please log in to upload bank statements.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Dashboard</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            Dashboard
+          </h1>
           <p className="text-gray-600">
             Upload your bank statements to start analyzing your finances
           </p>
@@ -165,45 +203,37 @@ export function Dashboard() {
 
                 {uploadStatus.status === 'uploading' && (
                   <>
-                    <div className="space-y-3">
-                      <Loader className="w-8 h-8 text-blue-600 mx-auto animate-spin" />
-                      <p className="text-gray-700 font-semibold">
-                        {uploadStatus.message}
-                      </p>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${uploadStatus.progress}%` }}
-                        />
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        {uploadStatus.progress}%
-                      </p>
+                    <Loader className="w-8 h-8 text-blue-600 mx-auto animate-spin" />
+                    <p className="text-gray-700 font-semibold">
+                      {uploadStatus.message}
+                    </p>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadStatus.progress}%` }}
+                      />
                     </div>
+                    <p className="text-sm text-gray-600">
+                      {uploadStatus.progress}%
+                    </p>
                   </>
                 )}
 
                 {uploadStatus.status === 'success' && (
                   <>
                     <CheckCircle className="w-12 h-12 text-green-500 mx-auto" />
-                    <div>
-                      <p className="text-lg font-semibold text-green-700">
-                        Success!
-                      </p>
-                      <p className="text-gray-600">{uploadStatus.message}</p>
-                    </div>
+                    <p className="text-gray-600">
+                      {uploadStatus.message}
+                    </p>
                   </>
                 )}
 
                 {uploadStatus.status === 'error' && (
                   <>
                     <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
-                    <div>
-                      <p className="text-lg font-semibold text-red-700">
-                        Upload Failed
-                      </p>
-                      <p className="text-gray-600">{uploadStatus.message}</p>
-                    </div>
+                    <p className="text-gray-600">
+                      {uploadStatus.message}
+                    </p>
                     <label
                       htmlFor="file-input"
                       className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg cursor-pointer transition"
@@ -221,50 +251,24 @@ export function Dashboard() {
               About This Tool
             </h3>
             <ul className="space-y-3 text-sm text-gray-600">
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Upload any bank statement PDF</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>We extract and analyze all transactions</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>View insights and spending patterns</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Get AI-powered recommendations</span>
-              </li>
+              <li>• Upload any bank statement PDF</li>
+              <li>• We extract and analyze all transactions</li>
+              <li>• View insights and spending patterns</li>
+              <li>• Get AI-powered recommendations</li>
             </ul>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <FileText className="w-6 h-6 text-blue-600" />
-              <h3 className="text-lg font-semibold text-gray-900">
-                Supported Formats
-              </h3>
-            </div>
-            <p className="text-gray-600 text-sm">
-              We support PDF bank statements from most major banks and financial institutions.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Your Account
-            </h3>
-            <div className="space-y-2 text-sm">
-              <p>
-                <span className="text-gray-600">Phone:</span>
-                <span className="font-mono text-gray-900 ml-2">{phone}</span>
-              </p>
-            </div>
-          </div>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Your Account
+          </h3>
+          <p className="text-sm text-gray-600">
+            Logged in as:{' '}
+            <span className="font-mono text-gray-900">
+              {auth.user.email}
+            </span>
+          </p>
         </div>
       </div>
     </div>

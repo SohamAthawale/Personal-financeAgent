@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
 import tempfile
-from pathlib import Path
 from datetime import datetime
 
 from sqlalchemy import text
@@ -20,11 +19,45 @@ from pipeline.core import (
 from flask_cors import CORS
 from dateutil.relativedelta import relativedelta
 
+from flask_jwt_extended import (
+    JWTManager,
+    create_access_token,
+    jwt_required,
+    get_jwt_identity,
+)
+
 # ==================================================
 # APP SETUP
 # ==================================================
 app = Flask(__name__)
 
+# 🔐 JWT CORE CONFIG (ORDER MATTERS)
+app.config["JWT_SECRET_KEY"] = "super-secret-key"  # MOVE TO ENV
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
+
+# 🔴 REQUIRED: TELL JWT TO READ FROM HEADERS
+app.config["JWT_TOKEN_LOCATION"] = ["headers"]
+app.config["JWT_HEADER_NAME"] = "Authorization"
+app.config["JWT_HEADER_TYPE"] = "Bearer"
+
+jwt = JWTManager(app)
+
+# ==================================================
+# JWT DEBUGGING (CRITICAL DURING DEV)
+# ==================================================
+@jwt.invalid_token_loader
+def invalid_token(reason):
+    print("❌ INVALID JWT:", reason)
+    return jsonify({"message": reason}), 422
+
+@jwt.unauthorized_loader
+def missing_token(reason):
+    print("❌ MISSING JWT:", reason)
+    return jsonify({"message": reason}), 401
+
+# ==================================================
+# CORS
+# ==================================================
 CORS(
     app,
     resources={r"/api/*": {"origins": [
@@ -32,76 +65,48 @@ CORS(
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5713",
     ]}},
-    methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
 # ==================================================
-# USER HELPERS
+# AUTH HELPERS
 # ==================================================
-def get_or_create_user(
-    db: Session,
-    phone: str,
-    email: str | None = None,
-    password: str | None = None,
-) -> User:
+def get_current_user(db: Session) -> User | None:
+    identity = get_jwt_identity()
+    if not identity:
+        return None
+    return db.query(User).filter(User.id == int(identity)).first()
 
-    user = db.query(User).filter(User.phone == phone).first()
-
-    if user:
-        if email and not user.email:
-            user.email = email
-
-        if password and not user.password_hash:
-            user.set_password(password)
-
-        db.commit()
-        db.refresh(user)
-        return user
-
-    user = User(phone=phone, email=email)
-
-    if password:
-        user.set_password(password)
-
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
 
 # ==================================================
-# 1️⃣ USER CREATE / LOGIN
+# AUTH / USER
 # ==================================================
-@app.route("/api/user", methods=["POST"])
-def create_or_get_user():
+@app.route("/api/auth/register", methods=["POST"])
+def register():
     data = request.get_json(silent=True) or {}
 
-    phone = data.get("phone")
     email = data.get("email")
     password = data.get("password")
+    phone = data.get("phone")  # optional
 
-    if not phone:
-        return jsonify({"status": "error", "message": "phone is required"}), 400
+    if not email or not password:
+        return {"message": "email and password required"}, 400
 
-    if password and len(password) < 8:
-        return jsonify({
-            "status": "error",
-            "message": "password must be at least 8 characters"
-        }), 400
+    if len(password) < 8:
+        return {"message": "password must be at least 8 characters"}, 400
 
     db = SessionLocal()
     try:
-        user = get_or_create_user(db, phone, email, password)
+        if db.query(User).filter(User.email == email).first():
+            return {"message": "email already registered"}, 409
 
-        return jsonify({
-            "status": "success",
-            "user": {
-                "id": user.id,
-                "phone": user.phone,
-                "email": user.email,
-                "has_password": bool(user.password_hash),
-            },
-        })
+        user = User(email=email, phone=phone)
+        user.set_password(password)
+
+        db.add(user)
+        db.commit()
+
+        return {"status": "success"}
     finally:
         db.close()
 
@@ -110,47 +115,41 @@ def create_or_get_user():
 def login():
     data = request.get_json(silent=True) or {}
 
-    phone = data.get("phone")
+    email = data.get("email")
     password = data.get("password")
 
-    if not phone or not password:
-        return jsonify({
-            "status": "error",
-            "message": "phone and password required"
-        }), 400
+    if not email or not password:
+        return {"message": "email and password required"}, 400
 
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.phone == phone).first()
+        user = db.query(User).filter(User.email == email).first()
 
-        if not user or not user.password_hash or not user.check_password(password):
-            return jsonify({
-                "status": "error",
-                "message": "Invalid credentials"
-            }), 401
+        if not user or not user.check_password(password):
+            return {"message": "invalid credentials"}, 401
 
-        return jsonify({
+        token = create_access_token(identity=str(user.id))
+
+
+        return {
             "status": "success",
+            "access_token": token,
             "user": {
                 "id": user.id,
-                "phone": user.phone,
                 "email": user.email,
             }
-        })
+        }
     finally:
         db.close()
 
 # ==================================================
-# 2️⃣ UPLOAD & PARSE STATEMENT
+# STATEMENT UPLOAD
 # ==================================================
 @app.route("/api/statement/parse", methods=["POST"])
+@jwt_required()
 def parse_statement_route():
     if "file" not in request.files:
-        return jsonify({"status": "error", "message": "No file uploaded"}), 400
-
-    phone = request.form.get("phone")
-    if not phone:
-        return jsonify({"status": "error", "message": "phone is required"}), 400
+        return {"message": "file required"}, 400
 
     file = request.files["file"]
 
@@ -160,47 +159,43 @@ def parse_statement_route():
 
     db = SessionLocal()
     try:
-        user = get_or_create_user(db, phone)
+        user = get_current_user(db)
+        if not user:
+            return {"message": "user not found"}, 404
 
         result = parse_statement(
             db=db,
             pdf_path=pdf_path,
             user_id=user.id,
         )
-
         return jsonify(result)
     finally:
         db.close()
 
 # ==================================================
-# 3️⃣ ANALYTICS
+# ANALYTICS
 # ==================================================
 @app.route("/api/statement/analytics", methods=["GET"])
+@jwt_required()
 def analytics_route():
-    phone = request.args.get("phone")
     month = request.args.get("month")
     period = request.args.get("period")
 
-    if not phone:
-        return jsonify({"status": "error", "message": "phone is required"}), 400
+    start_date = end_date = None
+
+    if month:
+        start_date = datetime.strptime(month, "%Y-%m")
+        end_date = start_date + relativedelta(months=1)
+    elif period:
+        months = int(period.replace("m", ""))
+        end_date = datetime.utcnow()
+        start_date = end_date - relativedelta(months=months)
 
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.phone == phone).first()
+        user = get_current_user(db)
         if not user:
-            return jsonify({"status": "error", "message": "User not found"}), 404
-
-        start_date = None
-        end_date = None
-
-        if month:
-            start_date = datetime.strptime(month, "%Y-%m")
-            end_date = start_date + relativedelta(months=1)
-
-        elif period:
-            months = int(period.replace("m", ""))
-            end_date = datetime.utcnow()
-            start_date = end_date - relativedelta(months=months)
+            return {"message": "user not found"}, 404
 
         result = compute_analytics(
             db=db,
@@ -208,71 +203,52 @@ def analytics_route():
             start_date=start_date,
             end_date=end_date,
         )
-
         return jsonify(result)
     finally:
         db.close()
 
 # ==================================================
-# 4️⃣ INSIGHTS
+# INSIGHTS
 # ==================================================
 @app.route("/api/statement/insights", methods=["GET"])
+@jwt_required()
 def insights_route():
-    phone = request.args.get("phone")
     force_refresh = request.args.get("force_refresh") == "true"
-
-    if not phone:
-        return jsonify({"status": "error", "message": "phone is required"}), 400
 
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.phone == phone).first()
+        user = get_current_user(db)
         if not user:
-            return jsonify({"status": "error", "message": "User not found"}), 404
+            return {"message": "user not found"}, 404
 
         result = generate_insights_view(
             db=db,
             user_id=user.id,
             force_refresh=force_refresh,
         )
-
         return jsonify(result)
     finally:
         db.close()
 
 # ==================================================
-# 5️⃣ AGENT RECOMMENDATIONS
+# AGENT RECOMMENDATIONS
 # ==================================================
 @app.route("/api/agent/recommendations", methods=["POST"])
+@jwt_required()
 def agent_route():
     data = request.get_json(silent=True) or {}
-    phone = data.get("phone")
-
-    if not phone:
-        return jsonify({
-            "status": "error",
-            "message": "phone is required"
-        }), 400
 
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.phone == phone).first()
+        user = get_current_user(db)
         if not user:
-            return jsonify({
-                "status": "error",
-                "message": "User not found"
-            }), 404
+            return {"message": "user not found"}, 404
 
-        # -----------------------------------------
-        # ✅ GOALS SOURCE OF TRUTH
-        # -----------------------------------------
         raw_goals = data.get("goals")
 
         if raw_goals:
-            # Frontend-provided goals (optional override)
             goals = parse_user_goals(raw_goals)
         else:
-            # 🔒 Load remembered goals from DB
             goals = [
                 FinancialGoal(
                     name=g.name,
@@ -289,26 +265,21 @@ def agent_route():
             user_id=user.id,
             goals=goals,
         )
-
         return jsonify(result)
-
     finally:
         db.close()
 
 # ==================================================
-# 6️⃣ GOALS API (FINAL, NO DUPLICATES)
+# GOALS API
 # ==================================================
-@app.route("/api/goals", methods=["GET"], endpoint="api_get_goals")
-def api_get_goals():
-    phone = request.args.get("phone")
-    if not phone:
-        return jsonify({"status": "error", "message": "phone required"}), 400
-
+@app.route("/api/goals", methods=["GET"])
+@jwt_required()
+def get_goals():
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.phone == phone).first()
+        user = get_current_user(db)
         if not user:
-            return jsonify({"status": "error", "message": "User not found"}), 404
+            return {"message": "user not found"}, 404
 
         goals = (
             db.query(FinancialGoal)
@@ -320,7 +291,7 @@ def api_get_goals():
             .all()
         )
 
-        return jsonify({
+        return {
             "status": "success",
             "goals": [
                 {
@@ -329,97 +300,79 @@ def api_get_goals():
                     "target_amount": g.target_amount,
                     "deadline": g.deadline.isoformat(),
                     "priority": g.priority,
-                    "created_at": g.created_at.isoformat(),
                 }
                 for g in goals
             ],
-        })
+        }
     finally:
         db.close()
 
 
-@app.route("/api/goals", methods=["POST"], endpoint="api_create_goals")
-def api_create_goals():
+@app.route("/api/goals", methods=["POST"])
+@jwt_required()
+def create_goals():
     data = request.get_json(silent=True) or {}
-    phone = data.get("phone")
     raw_goals = data.get("goals")
 
-    if not phone or not isinstance(raw_goals, list):
-        return jsonify({"status": "error", "message": "phone and goals required"}), 400
+    if not isinstance(raw_goals, list):
+        return {"message": "goals list required"}, 400
 
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.phone == phone).first()
+        user = get_current_user(db)
         if not user:
-            return jsonify({"status": "error", "message": "User not found"}), 404
+            return {"message": "user not found"}, 404
 
         parsed = parse_user_goals(raw_goals)
-        saved = 0
 
         for g in parsed:
-            exists = (
-                db.query(FinancialGoal)
-                .filter(
-                    FinancialGoal.user_id == user.id,
-                    FinancialGoal.name == g.name,
-                    FinancialGoal.is_active.is_(True),
-                )
-                .first()
-            )
-            if exists:
-                continue
+            exists = db.query(FinancialGoal).filter(
+                FinancialGoal.user_id == user.id,
+                FinancialGoal.name == g.name,
+                FinancialGoal.is_active.is_(True),
+            ).first()
 
-            db.add(
-                FinancialGoal(
+            if not exists:
+                db.add(FinancialGoal(
                     user_id=user.id,
                     name=g.name,
                     target_amount=g.target_amount,
                     deadline=g.deadline,
                     priority=g.priority,
-                )
-            )
-            saved += 1
+                ))
 
         db.commit()
-        return jsonify({"status": "success", "saved": saved})
+        return {"status": "success"}
     finally:
         db.close()
 
 
-@app.route("/api/goals/<int:goal_id>", methods=["DELETE"], endpoint="api_delete_goal")
-def api_delete_goal(goal_id):
-    phone = request.args.get("phone")
-    if not phone:
-        return jsonify({"status": "error", "message": "phone required"}), 400
-
+@app.route("/api/goals/<int:goal_id>", methods=["DELETE"])
+@jwt_required()
+def delete_goal(goal_id):
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.phone == phone).first()
+        user = get_current_user(db)
         if not user:
-            return jsonify({"status": "error", "message": "User not found"}), 404
+            return {"message": "user not found"}, 404
 
-        goal = (
-            db.query(FinancialGoal)
-            .filter(
-                FinancialGoal.id == goal_id,
-                FinancialGoal.user_id == user.id,
-                FinancialGoal.is_active.is_(True),
-            )
-            .first()
-        )
+        goal = db.query(FinancialGoal).filter(
+            FinancialGoal.id == goal_id,
+            FinancialGoal.user_id == user.id,
+            FinancialGoal.is_active.is_(True),
+        ).first()
 
         if not goal:
-            return jsonify({"status": "error", "message": "Goal not found"}), 404
+            return {"message": "goal not found"}, 404
 
         goal.is_active = False
         db.commit()
-
-        return jsonify({"status": "success"})
+        return {"status": "success"}
     finally:
         db.close()
 
 # ==================================================
-# DB HEALTH
+# HEALTH
 # ==================================================
 @app.route("/health/db")
 def db_health():

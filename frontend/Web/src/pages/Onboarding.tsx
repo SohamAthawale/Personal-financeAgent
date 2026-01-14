@@ -1,17 +1,14 @@
 import { useState } from 'react';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import { api } from '../lib/api';
-import { useAuth } from '../context/AuthContext';
 
 export function Onboarding({
   onBackToLogin,
 }: {
   onBackToLogin: () => void;
 }) {
-  const { setPhone } = useAuth();
-
-  const [phone, setPhoneLocal] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState(''); // optional metadata
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -22,11 +19,6 @@ export function Onboarding({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (!phone.trim()) {
-      setError('Phone number is required');
-      return;
-    }
 
     if (!email.trim() || !email.includes('@')) {
       setError('Valid email is required');
@@ -45,8 +37,9 @@ export function Onboarding({
 
     try {
       setLoading(true);
-      await api.createUser(phone, email, password);
-      setPhone(phone);
+
+      await api.register(email, password, phone || undefined);
+
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
@@ -55,6 +48,10 @@ export function Onboarding({
     }
   };
 
+  /* =======================
+     Success screen
+     ======================= */
+
   if (success) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -62,7 +59,7 @@ export function Onboarding({
           <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
           <h2 className="text-2xl font-bold">Account Created</h2>
           <p className="text-gray-600 mt-2">
-            You can now log in with your phone and password.
+            You can now log in with your email and password.
           </p>
 
           <button
@@ -75,6 +72,10 @@ export function Onboarding({
       </div>
     );
   }
+
+  /* =======================
+     Form
+     ======================= */
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4">
@@ -97,14 +98,15 @@ export function Onboarding({
           </div>
         )}
 
+        {/* Optional phone */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Phone Number
+            Phone Number (optional)
           </label>
           <input
             type="tel"
             value={phone}
-            onChange={(e) => setPhoneLocal(e.target.value)}
+            onChange={(e) => setPhone(e.target.value)}
             placeholder="9999999999"
             className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
           />
@@ -120,6 +122,7 @@ export function Onboarding({
             onChange={(e) => setEmail(e.target.value)}
             placeholder="user@example.com"
             className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+            required
           />
         </div>
 
@@ -133,6 +136,7 @@ export function Onboarding({
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Minimum 8 characters"
             className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+            required
           />
         </div>
 
@@ -146,6 +150,7 @@ export function Onboarding({
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="Re-enter password"
             className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+            required
           />
         </div>
 

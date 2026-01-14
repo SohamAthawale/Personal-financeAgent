@@ -31,7 +31,7 @@ type InsightsApiResponse = {
 };
 
 export function Insights() {
-  const { phone } = useAuth();
+  const { auth } = useAuth();
 
   const [data, setData] = useState<InsightsApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,8 +42,8 @@ export function Insights() {
      ======================= */
 
   const loadInsights = async (forceRefresh = false) => {
-    if (!phone) {
-      setError('User phone not found');
+    if (!auth) {
+      setError('You must be logged in to view insights');
       setLoading(false);
       return;
     }
@@ -53,7 +53,7 @@ export function Insights() {
       setError('');
 
       const result = (await api.getInsights(
-        phone,
+        auth.token,
         forceRefresh
       )) as InsightsApiResponse;
 
@@ -77,9 +77,13 @@ export function Insights() {
      ======================= */
 
   useEffect(() => {
-    loadInsights(false);
+    if (auth) {
+      loadInsights(false);
+    } else {
+      setLoading(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phone]);
+  }, [auth]);
 
   /* =======================
      Adapter: API → UI
@@ -110,12 +114,24 @@ export function Insights() {
      Render
      ======================= */
 
+  if (!auth && !loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-slate-500">
+          Please log in to view your insights.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Insights</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              Insights
+            </h1>
             <p className="text-gray-600">
               AI-powered analysis of your financial behavior
             </p>

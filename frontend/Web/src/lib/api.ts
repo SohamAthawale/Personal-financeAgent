@@ -6,51 +6,66 @@ import {
   ParseResponse,
   Goal,
   AnalyticsApiResponse
-} from '../types/index';
+} from '../types';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
+const API_BASE =
+  import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
+
+/* =========================
+   Helpers
+   ========================= */
+
+function authHeaders(token?: string) {
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+  };
+}
+
+/* =========================
+   API
+   ========================= */
 
 export const api = {
   /* =========================
-     Auth / User
+     Auth
      ========================= */
 
-  async createUser(
-    phone: string,
-    email?: string,
-    password?: string
+  async register(
+    email: string,
+    password: string,
+    phone?: string
   ): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE}/api/user`, {
+    const res = await fetch(`${API_BASE}/api/auth/register`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        phone,
-        ...(email && { email }),
-        ...(password && { password }),
-      }),
+      headers: authHeaders(),
+      body: JSON.stringify({ email, password, phone }),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to create user');
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Registration failed');
     }
 
-    return response.json();
+    return res.json();
   },
 
-  async login(phone: string, password: string): Promise<LoginResponse> {
-    const response = await fetch(`${API_BASE}/api/auth/login`, {
+  async login(
+    email: string,
+    password: string
+  ): Promise<LoginResponse> {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, password }),
+      headers: authHeaders(),
+      body: JSON.stringify({ email, password }),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Login failed');
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Login failed');
     }
 
-    return response.json();
+    return res.json();
   },
 
   /* =========================
@@ -59,21 +74,20 @@ export const api = {
 
   async uploadStatement(
     file: File,
-    phone: string,
+    token: string,
     onProgress?: (progress: number) => void
   ): Promise<ParseResponse> {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('phone', phone);
 
     const xhr = new XMLHttpRequest();
 
     return new Promise((resolve, reject) => {
-      xhr.upload.addEventListener('progress', (e) => {
+      xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
           onProgress?.((e.loaded / e.total) * 100);
         }
-      });
+      };
 
       xhr.onload = () => {
         try {
@@ -82,13 +96,14 @@ export const api = {
             ? resolve(res)
             : reject(new Error(res.message || 'Upload failed'));
         } catch {
-          reject(new Error('Invalid response'));
+          reject(new Error('Invalid server response'));
         }
       };
 
       xhr.onerror = () => reject(new Error('Network error'));
 
       xhr.open('POST', `${API_BASE}/api/statement/parse`);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.send(formData);
     });
   },
@@ -98,92 +113,100 @@ export const api = {
      ========================= */
 
   async getAnalytics(
-    phone: string,
+    token: string,
     params: { month?: string; period?: string }
   ): Promise<AnalyticsApiResponse> {
-    const searchParams = new URLSearchParams({ phone });
+    const search = new URLSearchParams();
 
-    if (params.month) searchParams.append('month', params.month);
-    if (params.period) searchParams.append('period', params.period);
+    if (params.month) search.append('month', params.month);
+    if (params.period) search.append('period', params.period);
 
-    const response = await fetch(
-      `${API_BASE}/api/statement/analytics?${searchParams}`,
-      { headers: { 'Content-Type': 'application/json' } }
+    const res = await fetch(
+      `${API_BASE}/api/statement/analytics?${search}`,
+      { headers: authHeaders(token) }
     );
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch analytics');
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to fetch analytics');
     }
 
-    return response.json();
+    return res.json();
   },
 
   /* =========================
-     Insights (with hard refresh)
+     Insights
      ========================= */
 
   async getInsights(
-    phone: string,
+    token: string,
     forceRefresh = false
   ): Promise<InsightsApiResponse> {
-    const params = new URLSearchParams({ phone });
+    const params = new URLSearchParams();
     if (forceRefresh) params.append('force_refresh', 'true');
 
-    const response = await fetch(
+    const res = await fetch(
       `${API_BASE}/api/statement/insights?${params}`,
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: authHeaders(token) }
     );
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch insights');
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to fetch insights');
     }
 
-    return response.json();
+    return res.json();
   },
 
   /* =========================
-     Goals (REMEMBERED)
+     Goals
      ========================= */
 
-  async getGoals(phone: string): Promise<{ goals: Goal[] }> {
-    const response = await fetch(
-      `${API_BASE}/api/goals?phone=${phone}`
+  async getGoals(token: string): Promise<{ goals: Goal[] }> {
+    const res = await fetch(
+      `${API_BASE}/api/goals`,
+      { headers: authHeaders(token) }
     );
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch goals');
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to fetch goals');
     }
 
-    return response.json();
+    return res.json();
   },
 
-  async createGoals(phone: string, goals: Goal[]): Promise<{ saved: number }> {
-    const response = await fetch(`${API_BASE}/api/goals`, {
+  async createGoals(
+    token: string,
+    goals: Goal[]
+  ): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/goals`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, goals }),
+      headers: authHeaders(token),
+      body: JSON.stringify({ goals }),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to save goals');
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to save goals');
     }
-
-    return response.json();
   },
 
-  async deleteGoal(phone: string, goalId: number): Promise<void> {
-    const response = await fetch(
-      `${API_BASE}/api/goals/${goalId}?phone=${phone}`,
-      { method: 'DELETE' }
+  async deleteGoal(
+    token: string,
+    goalId: number
+  ): Promise<void> {
+    const res = await fetch(
+      `${API_BASE}/api/goals/${goalId}`,
+      {
+        method: 'DELETE',
+        headers: authHeaders(token),
+      }
     );
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to delete goal');
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to delete goal');
     }
   },
 
@@ -192,24 +215,24 @@ export const api = {
      ========================= */
 
   async getRecommendations(
-    phone: string,
+    token: string,
     goals?: Goal[]
   ): Promise<RecommendationsApiResponse> {
-    const response = await fetch(`${API_BASE}/api/agent/recommendations`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        phone,
-        ...(goals && { goals }),
-      }),
-    });
+    const res = await fetch(
+      `${API_BASE}/api/agent/recommendations`,
+      {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ ...(goals && { goals }) }),
+      }
+    );
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch recommendations');
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to fetch recommendations');
     }
 
-    return response.json();
+    return res.json();
   },
 
   /* =========================
@@ -217,8 +240,8 @@ export const api = {
      ========================= */
 
   async healthCheck(): Promise<{ db: string }> {
-    const response = await fetch(`${API_BASE}/health/db`);
-    if (!response.ok) throw new Error('Health check failed');
-    return response.json();
+    const res = await fetch(`${API_BASE}/health/db`);
+    if (!res.ok) throw new Error('Health check failed');
+    return res.json();
   },
 };

@@ -6,41 +6,64 @@ import React, {
   useEffect,
 } from 'react';
 
-const AUTH_PHONE_KEY = 'userPhone';
+/* =========================
+   Storage key
+   ========================= */
+const AUTH_KEY = 'auth';
+
+/* =========================
+   Types
+   ========================= */
+type User = {
+  id: number;
+  email: string;
+};
+
+type AuthState = {
+  token: string;
+  user: User;
+};
 
 interface AuthContextType {
-  phone: string | null;
-  setPhone: (phone: string | null) => void;
+  auth: AuthState | null;
+  setAuth: (auth: AuthState | null) => void;
   logout: () => void;
   isAuthenticated: boolean;
 }
 
+/* =========================
+   Context
+   ========================= */
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/* =========================
+   Provider
+   ========================= */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [phone, setPhoneState] = useState<string | null>(() => {
-    return localStorage.getItem(AUTH_PHONE_KEY);
+  const [auth, setAuthState] = useState<AuthState | null>(() => {
+    const stored = localStorage.getItem(AUTH_KEY);
+    return stored ? JSON.parse(stored) : null;
   });
 
-  const setPhone = useCallback((newPhone: string | null) => {
-    setPhoneState(newPhone);
+  const setAuth = useCallback((newAuth: AuthState | null) => {
+    setAuthState(newAuth);
 
-    if (newPhone) {
-      localStorage.setItem(AUTH_PHONE_KEY, newPhone);
+    if (newAuth) {
+      localStorage.setItem(AUTH_KEY, JSON.stringify(newAuth));
     } else {
-      localStorage.removeItem(AUTH_PHONE_KEY);
+      localStorage.removeItem(AUTH_KEY);
     }
   }, []);
 
   const logout = useCallback(() => {
-    setPhone(null);
-  }, [setPhone]);
+    setAuth(null);
+  }, [setAuth]);
 
-  // Optional: sync logout across tabs
+  // 🔁 Sync login/logout across tabs
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === AUTH_PHONE_KEY) {
-        setPhoneState(e.newValue);
+      if (e.key === AUTH_KEY) {
+        setAuthState(e.newValue ? JSON.parse(e.newValue) : null);
       }
     };
 
@@ -48,15 +71,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  const isAuthenticated = Boolean(phone);
-
   return (
     <AuthContext.Provider
       value={{
-        phone,
-        setPhone,
+        auth,
+        setAuth,
         logout,
-        isAuthenticated,
+        isAuthenticated: Boolean(auth),
       }}
     >
       {children}
@@ -64,6 +85,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* =========================
+   Hook
+   ========================= */
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) {
