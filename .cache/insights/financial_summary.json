@@ -1,117 +1,97 @@
 {
-  "fingerprint": "6427cf7c6c3fe2a46924aed31ba7ad901dd5d4d70ae253a11f2ff3ea7a1019ec",
+  "fingerprint": "9fd298eacca7788aa8b93a13aff70c0faf2afa7e442e3380d0f2c2615714ed99",
   "metrics": {
-    "total_income": 88659.05,
-    "total_expense": 82646.7,
-    "net_cashflow": 6012.35,
-    "monthly_income": 88659.05,
-    "monthly_expense": 82646.7,
-    "monthly_savings": 6012.35,
-    "savings_rate": 0.0678,
+    "total_income": 22168.0,
+    "total_expense": 16980.14,
+    "net_cashflow": 5187.86,
+    "monthly_income": 22168.0,
+    "monthly_expense": 16980.14,
+    "monthly_savings": 5187.86,
+    "savings_rate": 0.234,
     "monthly_cashflow": [
       {
-        "month": "2025-10",
-        "amount": 10.0
-      },
-      {
         "month": "2025-11",
-        "amount": 7569.0
+        "amount": 5000.6
       },
       {
         "month": "2025-12",
-        "amount": -1540.65
-      },
-      {
-        "month": "2026-01",
-        "amount": -26.0
+        "amount": 187.26
       }
     ],
     "monthly_timeseries": [
       {
-        "month": "2025-10",
-        "income": 10.0,
-        "expense": 0.0,
-        "savings": 10.0
-      },
-      {
         "month": "2025-11",
-        "income": 67788.0,
-        "expense": 60219.0,
-        "savings": 7569.0
+        "income": 7828.0,
+        "expense": 2827.4,
+        "savings": 5000.6
       },
       {
         "month": "2025-12",
-        "income": 20861.05,
-        "expense": 22401.7,
-        "savings": -1540.65
-      },
-      {
-        "month": "2026-01",
-        "income": 0.0,
-        "expense": 26.0,
-        "savings": -26.0
+        "income": 14340.0,
+        "expense": 14152.74,
+        "savings": 187.26
       }
     ],
-    "avg_confidence": 0.996,
+    "avg_confidence": 1.0,
     "top_upi_counterparties": [
       {
-        "upi_id": "ARUNDHATI CHAIT_392351811296",
-        "transaction_count": 3,
-        "total_amount": 18450.0
-      },
-      {
-        "upi_id": "CHAITANYA PRAKA_570026931076",
-        "transaction_count": 3,
-        "total_amount": 15600.0
-      },
-      {
-        "upi_id": "SOHAMATHAWALE20_533409783240",
-        "transaction_count": 3,
-        "total_amount": 9384.0
-      },
-      {
-        "upi_id": "CHAITANYA PRAKA_567728319627",
-        "transaction_count": 3,
-        "total_amount": 9000.0
-      },
-      {
-        "upi_id": "LIFE STYLE INTE_693974695701",
-        "transaction_count": 3,
-        "total_amount": 9000.0
-      },
-      {
-        "upi_id": "SOHAMATHAWALE20_531074118261",
-        "transaction_count": 3,
-        "total_amount": 9000.0
-      },
-      {
-        "upi_id": "ARUNDHATI CHAIT_391720726072",
-        "transaction_count": 3,
-        "total_amount": 7500.0
-      },
-      {
-        "upi_id": "SOHAMATHAWALE20_571967941956",
+        "upi_id": "ali-6000764644@mbkns",
         "transaction_count": 1,
-        "total_amount": 5500.0
+        "total_amount": 999.33
       },
       {
-        "upi_id": "ARUNDHATI CHAIT_392993845599",
-        "transaction_count": 3,
-        "total_amount": 4500.0
+        "upi_id": "upi-zomato-payzomato@hdfcbank",
+        "transaction_count": 1,
+        "total_amount": 154.4
       },
       {
-        "upi_id": "SOHAMATHAWALE20_531048932301",
-        "transaction_count": 3,
-        "total_amount": 4500.0
+        "upi_id": "uts-bdpg2.iruts@sbi",
+        "transaction_count": 5,
+        "total_amount": 140.0
+      },
+      {
+        "upi_id": "mishra-q670548581@ybl",
+        "transaction_count": 1,
+        "total_amount": 135.0
+      },
+      {
+        "upi_id": "singh-9165930435@pthdfc",
+        "transaction_count": 1,
+        "total_amount": 120.0
+      },
+      {
+        "upi_id": "uts-bdpg.iruts@sbi",
+        "transaction_count": 1,
+        "total_amount": 30.0
+      },
+      {
+        "upi_id": "-q776683357@ybl",
+        "transaction_count": 1,
+        "total_amount": 25.0
+      },
+      {
+        "upi_id": "g-9022404301@okbi",
+        "transaction_count": 1,
+        "total_amount": 25.0
+      },
+      {
+        "upi_id": "and-q841366868@ybl",
+        "transaction_count": 1,
+        "total_amount": 20.0
+      },
+      {
+        "upi_id": "fruit-gpay-11172643035@okb",
+        "transaction_count": 1,
+        "total_amount": 20.0
       }
     ],
     "_audit": {
-      "transaction_count": 573,
-      "sum_deposits": 88659.05,
-      "sum_withdrawals": 82646.7,
+      "transaction_count": 121,
+      "sum_deposits": 22168.0,
+      "sum_withdrawals": 16980.14,
       "llm_backfilled": 0
     }
   },
   "model": "llama3",
-  "content": "Based on the provided metrics, here are the requested summaries:\n\n**Income, Expense, Net Cashflow Summary:**\n\n* Total Income: 88659.05\n* Total Expense: 82646.7\n* Net Cashflow: 6012.35\n\n**Cashflow Health:**\n\nThe net cashflow is positive (6012.35), indicating a healthy cash inflow. Therefore, I would categorize the cashflow health as **High**."
+  "content": "Based on the provided metrics, here are the requested summaries:\n\n**Income, Expense, Net Cashflow Summary:**\n\n* Total Income: 22168.0\n* Total Expense: 16980.14\n* Net Cashflow: 5187.86\n\n**Cashflow Health:**\n\nThe net cashflow of 5187.86 indicates a High level of cashflow health.\n\nNote: I have not computed or inferred any numbers, and only restated the provided totals verbatim as per the strict rules."
 }

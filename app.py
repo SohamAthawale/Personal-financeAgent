@@ -372,6 +372,160 @@ def delete_goal(goal_id):
         db.close()
 
 # ==================================================
+# TRANSACTIONS (WITH CONFIDENCE)
+# ==================================================
+@app.route("/api/transactions", methods=["GET"])
+@jwt_required()
+def get_transactions():
+    db = SessionLocal()
+    try:
+        user = get_current_user(db)
+        if not user:
+            return {"message": "user not found"}, 404
+
+        rows = db.execute(text("""
+            SELECT
+                t.id,
+                t.date,
+                t.description,
+                t.merchant,
+                t.amount,
+                t.category,
+                t.category_confidence,
+                t.category_source
+            FROM transactions t
+            JOIN statements s ON t.statement_id = s.id
+            WHERE s.user_id = :user_id
+            ORDER BY t.date DESC
+        """), {"user_id": user.id}).fetchall()
+
+        return {
+            "transactions": [
+                {
+                    "id": r.id,
+                    "date": r.date.isoformat(),
+                    "description": r.description,
+                    "merchant": r.merchant or r.description,
+                    "amount": float(r.amount),
+                    "category": r.category,
+                    "confidence": float(r.category_confidence or 1.0),
+                    "needs_review": (r.category_confidence or 1.0) < 0.70,
+                    "source": r.category_source,
+                }
+                for r in rows
+            ]
+        }
+    finally:
+        db.close()
+# ==================================================
+# TRANSACTION EXPLAINABILITY
+# ==================================================
+@app.route("/api/transaction/explain/<int:tx_id>", methods=["GET"])
+@jwt_required()
+def explain_transaction(tx_id):
+    db = SessionLocal()
+    try:
+        user = get_current_user(db)
+        if not user:
+            return {"message": "user not found"}, 404
+
+        row = db.execute(text("""
+            SELECT
+                t.id,
+                t.date,
+                t.description,
+                t.merchant,
+                t.category,
+                t.category_confidence,
+                t.category_source,
+                t.raw
+            FROM transactions t
+            JOIN statements s ON t.statement_id = s.id
+            WHERE t.id = :tx_id
+              AND s.user_id = :user_id
+        """), {
+            "tx_id": tx_id,
+            "user_id": user.id
+        }).fetchone()
+
+        if not row:
+            return {"message": "transaction not found"}, 404
+
+        return {
+            "transaction_id": row.id,
+            "merchant": row.merchant or row.description,
+            "category": row.category,
+            "confidence": float(row.category_confidence or 1.0),
+            "source": row.category_source,
+            "decision_metadata": row.raw or {},
+        }
+    finally:
+        db.close()
+from analytics.merchant_memory import save_merchant_category
+
+# ==================================================
+# MANUAL TRANSACTION CORRECTION
+# ==================================================
+@app.route("/api/transaction/correct", methods=["POST"])
+@jwt_required()
+def correct_transaction():
+    data = request.get_json(silent=True) or {}
+
+    tx_id = data.get("transaction_id")
+    merchant = data.get("merchant_normalized") or data.get("merchant")
+    category = data.get("category")
+    remember = data.get("remember", False)
+
+    if not tx_id or not merchant or not category:
+        return {"message": "missing required fields"}, 400
+
+    db = SessionLocal()
+    try:
+        user = get_current_user(db)
+        if not user:
+            return {"message": "user not found"}, 404
+
+        tx = db.execute(text("""
+            SELECT t.id, t.merchant
+            FROM transactions t
+            JOIN statements s ON t.statement_id = s.id
+            WHERE t.id = :tx_id
+              AND s.user_id = :user_id
+        """), {
+            "tx_id": tx_id,
+            "user_id": user.id
+        }).fetchone()
+
+        if not tx:
+            return {"message": "transaction not found"}, 404
+
+        db.execute(text("""
+            UPDATE transactions
+            SET
+                merchant = :merchant,
+                category = :category,
+                category_confidence = 1.0,
+                category_source = 'user'
+            WHERE id = :tx_id
+        """), {
+            "merchant": merchant,
+            "category": category,
+            "tx_id": tx_id,
+        })
+
+        if remember:
+            save_merchant_category(
+                merchant=tx.merchant,
+                category=category,
+                confidence=1.0
+            )
+
+        db.commit()
+        return {"status": "success"}
+    finally:
+        db.close()
+
+# ==================================================
 # HEALTH
 # ==================================================
 @app.route("/health/db")

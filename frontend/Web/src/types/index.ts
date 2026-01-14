@@ -14,10 +14,7 @@ export interface AuthResponse {
 export interface LoginResponse {
   status: 'success';
   access_token: string;
-  user: {
-    id: number;
-    email: string;
-  };
+  user: User;
   message?: string;
 }
 

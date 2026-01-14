@@ -6,6 +6,8 @@ import React, {
   useEffect,
 } from 'react';
 
+import type { User } from '../types';
+
 /* =========================
    Storage key
    ========================= */
@@ -14,10 +16,6 @@ const AUTH_KEY = 'auth';
 /* =========================
    Types
    ========================= */
-type User = {
-  id: number;
-  email: string;
-};
 
 type AuthState = {
   token: string;

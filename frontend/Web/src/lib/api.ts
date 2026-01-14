@@ -8,6 +8,26 @@ import {
   AnalyticsApiResponse
 } from '../types';
 
+/* =========================
+   Transactions (Trust)
+   ========================= */
+
+export interface Transaction {
+  id: number;
+  date: string;
+  description: string;
+  amount: number;
+  merchant: string;
+  category: string;
+  confidence: number;
+  needs_review: boolean;
+  corrected: boolean;
+}
+
+export interface TransactionsResponse {
+  transactions: Transaction[];
+}
+
 const API_BASE =
   import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
 
@@ -106,6 +126,73 @@ export const api = {
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.send(formData);
     });
+  },
+
+  /* =========================
+     Transactions (Trust & Review)
+     ========================= */
+
+  async getTransactions(
+    token: string
+  ): Promise<TransactionsResponse> {
+    const res = await fetch(
+      `${API_BASE}/api/transactions`,
+      { headers: authHeaders(token) }
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to fetch transactions');
+    }
+
+    return res.json();
+  },
+
+  async explainTransaction(
+    transactionId: number,
+    token: string
+  ): Promise<any> {
+    const res = await fetch(
+      `${API_BASE}/api/transaction/explain/${transactionId}`,
+      { headers: authHeaders(token) }
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(
+        err.message || 'Failed to fetch transaction explanation'
+      );
+    }
+
+    return res.json();
+  },
+
+  async correctTransaction(
+    token: string,
+    payload: {
+      transaction_id: number;
+      merchant_normalized: string;
+      category: string;
+      remember: boolean;
+    }
+  ): Promise<{ status: string }> {
+    const res = await fetch(
+      `${API_BASE}/api/transaction/correct`,
+      {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(
+        err.message || 'Failed to correct transaction'
+      );
+    }
+
+    return res.json();
   },
 
   /* =========================

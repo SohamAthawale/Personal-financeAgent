@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Upload,
   AlertCircle,
@@ -8,12 +8,32 @@ import {
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
+/* =======================
+   Types
+   ======================= */
+
 interface UploadStatus {
   status: 'idle' | 'uploading' | 'success' | 'error';
   progress: number;
   message: string;
   transactionCount?: number;
 }
+
+interface Transaction {
+  id: number;
+  date: string;
+  description: string;
+  amount: number;
+  merchant: string;
+  category: string;
+  confidence: number;
+  needs_review: boolean;
+  corrected: boolean;
+}
+
+/* =======================
+   Component
+   ======================= */
 
 export function Dashboard() {
   const { auth } = useAuth();
@@ -23,7 +43,38 @@ export function Dashboard() {
     progress: 0,
     message: '',
   });
+
   const [dragActive, setDragActive] = useState(false);
+
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loadingTx, setLoadingTx] = useState(false);
+
+  const [explainTx, setExplainTx] = useState<any | null>(null);
+  const [editTx, setEditTx] = useState<Transaction | null>(null);
+  const [editCategory, setEditCategory] = useState('');
+  const [editMerchant, setEditMerchant] = useState('');
+  const [remember, setRemember] = useState(true);
+
+  /* =======================
+     Fetch transactions
+     ======================= */
+
+  const fetchTransactions = async () => {
+    if (!auth?.token) return;
+    setLoadingTx(true);
+    try {
+      const res = await api.getTransactions(auth.token);
+      setTransactions(res.transactions || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingTx(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [auth?.token]);
 
   /* =======================
      Upload handler
@@ -39,14 +90,7 @@ export function Dashboard() {
       return;
     }
 
-    if (!auth?.token) {
-      setUploadStatus({
-        status: 'error',
-        progress: 0,
-        message: 'You must be logged in to upload a statement',
-      });
-      return;
-    }
+    if (!auth?.token) return;
 
     try {
       setUploadStatus({
@@ -70,67 +114,86 @@ export function Dashboard() {
         setUploadStatus({
           status: 'success',
           progress: 100,
-          message: `Successfully parsed ${
-            result.transactions_count || 0
-          } transactions`,
-          transactionCount: result.transactions_count,
+          message: `Parsed ${result.transactions_count || 0} transactions`,
         });
 
+        await fetchTransactions();
+
         setTimeout(() => {
-          setUploadStatus({
-            status: 'idle',
-            progress: 0,
-            message: '',
-          });
-        }, 3000);
+          setUploadStatus({ status: 'idle', progress: 0, message: '' });
+        }, 2500);
       } else {
-        setUploadStatus({
-          status: 'error',
-          progress: 0,
-          message: result.message || 'Failed to parse statement',
-        });
+        throw new Error(result.message);
       }
-    } catch (err) {
+    } catch (err: any) {
       setUploadStatus({
         status: 'error',
         progress: 0,
-        message:
-          err instanceof Error
-            ? err.message
-            : 'An error occurred during upload',
+        message: err.message || 'Upload failed',
       });
     }
   };
 
   /* =======================
-     Drag & drop handlers
+     Drag & drop
      ======================= */
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
+    setDragActive(e.type !== 'dragleave');
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      handleFile(files[0]);
-    }
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
   };
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      handleFile(e.target.files[0]);
-    }
+  /* =======================
+     Explain / Edit
+     ======================= */
+
+  const openExplain = async (id: number) => {
+    if (!auth?.token) return;
+    const res = await api.explainTransaction(id, auth.token);
+    setExplainTx(res);
+  };
+
+  const openEdit = (tx: Transaction) => {
+    setEditTx(tx);
+    setEditCategory(tx.category);
+    setEditMerchant(tx.merchant);
+    setRemember(true);
+  };
+
+  const saveEdit = async () => {
+    if (!auth?.token || !editTx) return;
+
+    await api.correctTransaction(auth.token, {
+      transaction_id: editTx.id,
+      merchant_normalized: editMerchant,
+      category: editCategory,
+      remember,
+    });
+
+    setTransactions((prev) =>
+      prev.map((t) =>
+        t.id === editTx.id
+          ? {
+              ...t,
+              merchant: editMerchant,
+              category: editCategory,
+              confidence: 1.0,
+              corrected: true,
+              needs_review: false,
+            }
+          : t
+      )
+    );
+
+    setEditTx(null);
   };
 
   /* =======================
@@ -140,135 +203,169 @@ export function Dashboard() {
   if (!auth) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-slate-500">
-          Please log in to upload bank statements.
-        </p>
+        <p className="text-gray-500">Please log in.</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Dashboard
-          </h1>
-          <p className="text-gray-600">
-            Upload your bank statements to start analyzing your finances
-          </p>
-        </div>
+    <div className="min-h-screen bg-gray-50 p-8 max-w-7xl mx-auto">
+      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-2">
-            <div
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-lg p-12 text-center transition ${
-                dragActive
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-300 bg-white'
-              }`}
-            >
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={handleFileInput}
-                className="hidden"
-                id="file-input"
-                disabled={uploadStatus.status === 'uploading'}
-              />
+      {/* Upload */}
+      <div
+        onDragEnter={handleDrag}
+        onDragLeave={handleDrag}
+        onDragOver={handleDrag}
+        onDrop={handleDrop}
+        className={`border-2 border-dashed rounded-lg p-10 text-center mb-8 ${
+          dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white'
+        }`}
+      >
+        <input
+          type="file"
+          accept=".pdf"
+          id="file"
+          className="hidden"
+          onChange={(e) => e.target.files && handleFile(e.target.files[0])}
+        />
+        <Upload className="w-10 h-10 mx-auto mb-2 text-gray-400" />
+        <label htmlFor="file" className="cursor-pointer text-blue-600">
+          Upload bank statement PDF
+        </label>
 
-              <div className="space-y-4">
-                <Upload className="w-12 h-12 text-gray-400 mx-auto" />
-
-                {uploadStatus.status === 'idle' && (
-                  <>
-                    <div>
-                      <p className="text-lg font-semibold text-gray-900">
-                        Drag and drop your PDF
-                      </p>
-                      <p className="text-gray-600">or click to browse</p>
-                    </div>
-                    <label
-                      htmlFor="file-input"
-                      className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg cursor-pointer transition"
-                    >
-                      Choose File
-                    </label>
-                  </>
-                )}
-
-                {uploadStatus.status === 'uploading' && (
-                  <>
-                    <Loader className="w-8 h-8 text-blue-600 mx-auto animate-spin" />
-                    <p className="text-gray-700 font-semibold">
-                      {uploadStatus.message}
-                    </p>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${uploadStatus.progress}%` }}
-                      />
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      {uploadStatus.progress}%
-                    </p>
-                  </>
-                )}
-
-                {uploadStatus.status === 'success' && (
-                  <>
-                    <CheckCircle className="w-12 h-12 text-green-500 mx-auto" />
-                    <p className="text-gray-600">
-                      {uploadStatus.message}
-                    </p>
-                  </>
-                )}
-
-                {uploadStatus.status === 'error' && (
-                  <>
-                    <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
-                    <p className="text-gray-600">
-                      {uploadStatus.message}
-                    </p>
-                    <label
-                      htmlFor="file-input"
-                      className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg cursor-pointer transition"
-                    >
-                      Try Again
-                    </label>
-                  </>
-                )}
-              </div>
-            </div>
+        {uploadStatus.status === 'uploading' && (
+          <div className="mt-4">
+            <Loader className="animate-spin mx-auto" />
+            <p>{uploadStatus.progress}%</p>
           </div>
+        )}
 
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              About This Tool
-            </h3>
-            <ul className="space-y-3 text-sm text-gray-600">
-              <li>• Upload any bank statement PDF</li>
-              <li>• We extract and analyze all transactions</li>
-              <li>• View insights and spending patterns</li>
-              <li>• Get AI-powered recommendations</li>
-            </ul>
-          </div>
-        </div>
+        {uploadStatus.status === 'success' && (
+          <CheckCircle className="mx-auto text-green-500 mt-4" />
+        )}
 
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            Your Account
-          </h3>
-          <p className="text-sm text-gray-600">
-            Logged in as:{' '}
-            <span className="font-mono text-gray-900">
-              {auth.user.email}
-            </span>
-          </p>
+        {uploadStatus.status === 'error' && (
+          <AlertCircle className="mx-auto text-red-500 mt-4" />
+        )}
+      </div>
+
+      {/* Transactions */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="font-semibold mb-4">Transactions</h2>
+
+        {loadingTx ? (
+          <p>Loading...</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th>Date</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Amount</th>
+                <th>Confidence</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map((tx) => (
+                <tr
+                  key={tx.id}
+                  className={`border-b ${
+                    tx.needs_review ? 'bg-yellow-50' : ''
+                  }`}
+                >
+                  <td>{tx.date.slice(0, 10)}</td>
+                  <td>{tx.description}</td>
+                  <td>{tx.category}</td>
+                  <td className="text-right">{tx.amount.toFixed(2)}</td>
+                  <td>
+                    {(tx.confidence * 100).toFixed(0)}%
+                  </td>
+                  <td className="space-x-2 text-right">
+                    <button
+                      onClick={() => openExplain(tx.id)}
+                      className="text-blue-600 text-xs"
+                    >
+                      Explain
+                    </button>
+                    <button
+                      onClick={() => openEdit(tx)}
+                      className="text-gray-600 text-xs"
+                    >
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Explain Modal */}
+      {explainTx && (
+        <Modal onClose={() => setExplainTx(null)}>
+          <pre className="text-xs bg-gray-100 p-4 rounded">
+            {JSON.stringify(explainTx, null, 2)}
+          </pre>
+        </Modal>
+      )}
+
+      {/* Edit Modal */}
+      {editTx && (
+        <Modal onClose={() => setEditTx(null)}>
+          <h3 className="font-semibold mb-2">Edit Transaction</h3>
+          <input
+            className="border p-2 w-full mb-2"
+            value={editMerchant}
+            onChange={(e) => setEditMerchant(e.target.value)}
+          />
+          <input
+            className="border p-2 w-full mb-2"
+            value={editCategory}
+            onChange={(e) => setEditCategory(e.target.value)}
+          />
+          <label className="text-sm flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+            />
+            Remember this correction
+          </label>
+          <button
+            onClick={saveEdit}
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded"
+          >
+            Save
+          </button>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* =======================
+   Modal helper
+   ======================= */
+
+function Modal({
+  children,
+  onClose,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg max-w-lg w-full">
+        {children}
+        <div className="text-right mt-4">
+          <button onClick={onClose} className="text-blue-600">
+            Close
+          </button>
         </div>
       </div>
     </div>

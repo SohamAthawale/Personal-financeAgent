@@ -42,6 +42,9 @@ MERCHANT_OVERRIDES = {
     "airtel": "Bills",
     "vi prepaid": "Bills",
     "vodafone": "Bills",
+
+    "chemist": "Medical",
+    "CHEMIST": "Medical",
 }
 
 # ==================================================

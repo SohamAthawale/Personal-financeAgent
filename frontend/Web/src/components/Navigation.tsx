@@ -16,7 +16,7 @@ export function Navigation({
   currentPage,
   onPageChange,
 }: NavigationProps) {
-  const { logout, phone } = useAuth();
+  const { logout, auth } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   const pages: { id: Page; label: string }[] = [
@@ -36,12 +36,19 @@ export function Navigation({
     setMobileMenuOpen(false);
   };
 
+  const userLabel =
+    auth?.user?.phone ||
+    auth?.user?.email ||
+    'Logged in';
+
   return (
     <nav className="bg-white shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-blue-600">FA</h1>
+            <h1 className="text-2xl font-bold text-blue-600">
+              FA
+            </h1>
           </div>
 
           {/* Desktop menu */}
@@ -63,7 +70,9 @@ export function Navigation({
 
           {/* Desktop user info */}
           <div className="hidden md:flex items-center gap-4">
-            <span className="text-sm text-gray-600">{phone}</span>
+            <span className="text-sm text-gray-600">
+              {userLabel}
+            </span>
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition font-medium"
@@ -104,7 +113,9 @@ export function Navigation({
             ))}
 
             <div className="border-t border-gray-200 mt-4 pt-4">
-              <p className="px-4 text-sm text-gray-600 mb-2">{phone}</p>
+              <p className="px-4 text-sm text-gray-600 mb-2">
+                {userLabel}
+              </p>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 w-full text-left py-2 px-4 text-gray-600 hover:text-red-600 transition font-medium"
