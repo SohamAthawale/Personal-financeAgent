@@ -24,15 +24,14 @@ def is_opening_balance_row(row):
 # ==================================================
 def compute_metrics_from_df(df: pd.DataFrame):
     """
-    Compute financial metrics from a transactions DataFrame.
+    Compute deterministic financial metrics from a transactions DataFrame.
 
-    Expected columns:
-    - date
-    - description
-    - deposit
-    - withdrawal
-    - balance
-    - confidence
+    Guarantees:
+    - No LLM involvement
+    - Order-independent
+    - Opening balance excluded
+    - No NaN / Infinity values
+    - UI-ready metrics
     """
 
     if df.empty:
@@ -57,11 +56,13 @@ def compute_metrics_from_df(df: pd.DataFrame):
     df["date"] = pd.to_datetime(df["date"])
 
     # ---------- Remove ONLY true opening balance ----------
-    df_txn = df.loc[~df.apply(is_opening_balance_row, axis=1)].copy()
+    df_txn = df.loc[
+        ~df.apply(is_opening_balance_row, axis=1)
+    ].copy()
 
     # ---------- Core totals ----------
-    total_income = round(df_txn["deposit"].sum(), 2)
-    total_expense = round(df_txn["withdrawal"].sum(), 2)
+    total_income = round(float(df_txn["deposit"].sum()), 2)
+    total_expense = round(float(df_txn["withdrawal"].sum()), 2)
     net_cashflow = round(total_income - total_expense, 2)
 
     # ---------- Safety invariant ----------
@@ -69,26 +70,61 @@ def compute_metrics_from_df(df: pd.DataFrame):
         "Cashflow invariant violated"
     )
 
-    # ---------- Monthly cashflow ----------
-    df_txn["month"] = df_txn["date"].dt.to_period("M")
+    # ---------- Monthly aggregation ----------
+    df_txn["month"] = df_txn["date"].dt.to_period("M").astype(str)
 
-    monthly_cashflow = (
+    monthly_summary = (
         df_txn
-        .groupby("month", as_index=False)[["deposit", "withdrawal"]]
-        .sum()
-        .assign(amount=lambda x: x["deposit"] - x["withdrawal"])
-        .astype({"month": str})
-        [["month", "amount"]]
+        .groupby("month", as_index=False)
+        .agg(
+            income=("deposit", "sum"),
+            expense=("withdrawal", "sum"),
+        )
+    )
+
+    monthly_summary["savings"] = (
+        monthly_summary["income"] - monthly_summary["expense"]
+    )
+
+    monthly_summary = monthly_summary.round(2)
+
+    # ---------- Monthly cashflow (legacy compatibility) ----------
+    monthly_cashflow = (
+        monthly_summary[["month", "savings"]]
+        .rename(columns={"savings": "amount"})
         .to_dict(orient="records")
     )
 
-    # ---------- Metrics payload ----------
+    # ---------- UI-normalized metrics (NO NaN EVER) ----------
+    monthly_income = total_income
+    monthly_expense = total_expense
+    monthly_savings = max(monthly_income - monthly_expense, 0.0)
+
+    savings_rate = (
+        monthly_savings / monthly_income
+        if monthly_income > 0
+        else 0.0
+    )
+
+    # ---------- Final metrics payload ----------
     metrics = {
+        # Core (authoritative)
         "total_income": total_income,
         "total_expense": total_expense,
         "net_cashflow": net_cashflow,
+
+        # UI cards
+        "monthly_income": round(monthly_income, 2),
+        "monthly_expense": round(monthly_expense, 2),
+        "monthly_savings": round(monthly_savings, 2),
+        "savings_rate": round(savings_rate, 4),
+
+        # Charts
         "monthly_cashflow": monthly_cashflow,
-        "avg_confidence": round(df_txn["confidence"].mean(), 3),
+        "monthly_timeseries": monthly_summary.to_dict(orient="records"),
+
+        # Confidence / audit
+        "avg_confidence": round(float(df_txn["confidence"].mean()), 3),
     }
 
     return metrics, df_txn

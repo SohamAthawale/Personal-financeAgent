@@ -1,9 +1,13 @@
 {
-  "fingerprint": "b27dd22c06c3aa545c9d29d36e44591c2d48afc2c67afe351f948c0d6b42e369",
+  "fingerprint": "6427cf7c6c3fe2a46924aed31ba7ad901dd5d4d70ae253a11f2ff3ea7a1019ec",
   "metrics": {
     "total_income": 88659.05,
     "total_expense": 82646.7,
     "net_cashflow": 6012.35,
+    "monthly_income": 88659.05,
+    "monthly_expense": 82646.7,
+    "monthly_savings": 6012.35,
+    "savings_rate": 0.0678,
     "monthly_cashflow": [
       {
         "month": "2025-10",
@@ -15,11 +19,37 @@
       },
       {
         "month": "2025-12",
-        "amount": -1540.6500000000015
+        "amount": -1540.65
       },
       {
         "month": "2026-01",
         "amount": -26.0
+      }
+    ],
+    "monthly_timeseries": [
+      {
+        "month": "2025-10",
+        "income": 10.0,
+        "expense": 0.0,
+        "savings": 10.0
+      },
+      {
+        "month": "2025-11",
+        "income": 67788.0,
+        "expense": 60219.0,
+        "savings": 7569.0
+      },
+      {
+        "month": "2025-12",
+        "income": 20861.05,
+        "expense": 22401.7,
+        "savings": -1540.65
+      },
+      {
+        "month": "2026-01",
+        "income": 0.0,
+        "expense": 26.0,
+        "savings": -26.0
       }
     ],
     "avg_confidence": 0.996,
@@ -83,5 +113,5 @@
     }
   },
   "model": "llama3",
-  "content": "Based on the provided metrics, here are the requested summaries:\n\n**Income, Expense, Net Cashflow Summary**\n\n* Total income: 88659.05\n* Total expense: 82646.7\n* Net cash flow: 6012.35\n\n**Cashflow Health**\n\nThe net cash flow is positive (6012.35), indicating a High level of cash flow health.\n\nNote: I have only used the provided metrics and restated totals verbatim, without computing or inferring any numbers."
+  "content": "Based on the provided metrics, here are the requested summaries:\n\n**Income, Expense, Net Cashflow Summary:**\n\n* Total Income: 88659.05\n* Total Expense: 82646.7\n* Net Cashflow: 6012.35\n\n**Cashflow Health:**\n\nThe net cashflow is positive (6012.35), indicating a healthy cash inflow. Therefore, I would categorize the cashflow health as **High**."
 }

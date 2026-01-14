@@ -47,6 +47,8 @@ class User(Base):
             return False
         return check_password_hash(self.password_hash, password)
 
+    def active_goals(self):
+        return [g for g in self.financial_goals if g.is_active]
 
 # =========================
 # STATEMENT (1 per PDF)
@@ -99,6 +101,36 @@ class Transaction(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     statement = relationship("Statement", back_populates="transactions")
+from sqlalchemy import Boolean
+from datetime import datetime
+
+class FinancialGoal(Base):
+    __tablename__ = "financial_goals"
+
+    id = Column(Integer, primary_key=True)
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    name = Column(String, nullable=False)
+    target_amount = Column(Float, nullable=False)
+    deadline = Column(Date, nullable=False)
+
+    priority = Column(String, default="medium")
+
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        nullable=False
+    )
+
+    user = relationship("User", backref="financial_goals")
 
 
 # =========================
@@ -107,3 +139,4 @@ class Transaction(Base):
 Index("ix_statement_user", Statement.user_id)
 Index("ix_transaction_date", Transaction.date)
 Index("ix_transaction_statement", Transaction.statement_id)
+Index("ix_goal_user_active", FinancialGoal.user_id, FinancialGoal.is_active)

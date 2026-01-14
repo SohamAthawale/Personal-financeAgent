@@ -1,53 +1,72 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Loader,
   AlertCircle,
   Plus,
   X,
   Sparkles,
+  CheckCircle,
+  AlertTriangle,
+  Target,
+  TrendingUp,
 } from 'lucide-react';
+
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
+
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Goal } from '../types';
 
 /* =======================
-   Local API response type
+   Types
    ======================= */
 
 type StructuredRecommendation = {
   message: string;
   action?: string;
   severity?: 'critical' | 'high' | 'medium' | 'low' | 'info';
-  confidence?: number;
+};
+
+type ProjectionPoint = {
+  month: string;
+  amount: number;
+};
+
+type GoalEvaluation = {
+  goal: string;
+  feasible: boolean;
+  months_remaining: number;
+  required_monthly_saving: number;
+  current_monthly_saving: number;
+  projection_series?: ProjectionPoint[];
+};
+
+type Metrics = {
+  monthly_income: number;
+  monthly_expense: number;
+  monthly_savings: number;
+  savings_rate: number;
 };
 
 type RecommendationsApiResponse = {
-  responses: string[];
-  actions: string[];
-  forecast_balance: number;
-
-  goal_evaluations: Array<{
-    goal: string;
-    feasible: boolean;
-    months_remaining: number;
-    required_monthly_saving: number;
-    current_monthly_saving: number;
-  }>;
-
+  status: string;
+  metrics?: Metrics;
+  goal_evaluations: GoalEvaluation[];
   recommendations?: {
-    critical?: StructuredRecommendation[];
-    forecast?: StructuredRecommendation[];
     goals?: StructuredRecommendation[];
   };
-
-  state: {
-    avg_monthly_income: number;
-    avg_monthly_expense: number;
-    current_balance: number;
-    liquidity_days: number;
-    savings_rate: number;
-  };
 };
+
+/* =======================
+   Component
+   ======================= */
 
 export function Goals() {
   const { phone } = useAuth();
@@ -55,6 +74,7 @@ export function Goals() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [recommendations, setRecommendations] =
     useState<RecommendationsApiResponse | null>(null);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -67,96 +87,103 @@ export function Goals() {
   });
 
   /* =======================
-     Goal handlers
+     Load goals
      ======================= */
 
-  const handleAddGoal = () => {
-    if (!newGoal.name.trim()) {
-      setError('Goal name is required');
-      return;
-    }
-    if (newGoal.target_amount <= 0) {
-      setError('Target amount must be greater than 0');
-      return;
-    }
-    if (!newGoal.deadline) {
-      setError('Deadline is required');
-      return;
-    }
+  useEffect(() => {
+    if (!phone) return;
 
-    setGoals([...goals, { ...newGoal }]);
-    setNewGoal({
-      name: '',
-      target_amount: 0,
-      deadline: '',
-      priority: 'medium',
-    });
-    setError('');
-  };
-
-  const handleRemoveGoal = (index: number) => {
-    setGoals(goals.filter((_, i) => i !== index));
-  };
+    api
+      .getGoals(phone)
+      .then((res) => setGoals(res.goals))
+      .catch(() => setError('Failed to load goals'));
+  }, [phone]);
 
   /* =======================
-     Fetch recommendations
+     Safe goal evaluations
      ======================= */
 
-  const handleGetRecommendations = async () => {
-    if (!phone) {
-      setError('User phone not found');
+  const safeGoalEvaluations = useMemo(() => {
+    return (
+      recommendations?.goal_evaluations.map((g) => ({
+        ...g,
+        projection_series: Array.isArray(g.projection_series)
+          ? g.projection_series
+          : [],
+      })) ?? []
+    );
+  }, [recommendations]);
+
+  /* =======================
+     Create goal
+     ======================= */
+
+  const handleAddGoal = async () => {
+    if (!phone) return;
+
+    if (
+      !newGoal.name.trim() ||
+      !newGoal.deadline ||
+      newGoal.target_amount <= 0
+    ) {
+      setError('All goal fields are required');
+      return;
+    }
+
+    if (new Date(newGoal.deadline) <= new Date()) {
+      setError('Deadline must be in the future');
       return;
     }
 
     try {
-      setLoading(true);
+      await api.createGoals(phone, [newGoal]);
+      const refreshed = await api.getGoals(phone);
+      setGoals(refreshed.goals);
+      setNewGoal({
+        name: '',
+        target_amount: 0,
+        deadline: '',
+        priority: 'medium',
+      });
       setError('');
-
-      const result = (await api.getRecommendations(
-        phone,
-        goals.length > 0 ? goals : undefined
-      )) as RecommendationsApiResponse;
-
-      setRecommendations(result);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to get recommendations'
-      );
-      setRecommendations(null);
-    } finally {
-      setLoading(false);
+    } catch {
+      setError('Failed to save goal');
     }
   };
 
   /* =======================
-     Render helpers
+     Delete goal
      ======================= */
 
-  const renderBlock = (
-    title: string,
-    items?: StructuredRecommendation[],
-    color = 'gray'
-  ) => {
-    if (!items || items.length === 0) return null;
+  const handleDeleteGoal = async (goalId: number) => {
+    if (!phone) return;
 
-    const colorMap: Record<string, string> = {
-      red: 'bg-red-50 border-red-200 text-red-700',
-      yellow: 'bg-yellow-50 border-yellow-200 text-yellow-700',
-      green: 'bg-green-50 border-green-200 text-green-700',
-      blue: 'bg-blue-50 border-blue-200 text-blue-700',
-      gray: 'bg-gray-50 border-gray-200 text-gray-700',
-    };
+    try {
+      await api.deleteGoal(phone, goalId);
+      setGoals((prev) => prev.filter((g) => g.id !== goalId));
+    } catch {
+      setError('Failed to delete goal');
+    }
+  };
 
-    return (
-      <div className={`border rounded-lg p-4 mb-4 ${colorMap[color]}`}>
-        <p className="font-semibold mb-2">{title}</p>
-        <ul className="list-disc pl-5 space-y-1">
-          {items.map((r, i) => (
-            <li key={i}>{r.message}</li>
-          ))}
-        </ul>
-      </div>
-    );
+  /* =======================
+     Get analytics + AI
+     ======================= */
+
+  const handleGetRecommendations = async () => {
+    if (!phone) return;
+
+    try {
+      setLoading(true);
+      const res = await api.getRecommendations(phone);
+      setRecommendations(res);
+      setMetrics(res.metrics ?? null);
+      setError('');
+    } catch {
+      setError('Failed to get analytics & recommendations');
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* =======================
@@ -164,189 +191,240 @@ export function Goals() {
      ======================= */
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Goals & Recommendations
+    <div className="min-h-screen bg-slate-100 p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <Target className="text-indigo-600" size={32} />
+          <h1 className="text-4xl font-bold text-slate-800">
+            Financial Goals
           </h1>
-          <p className="text-gray-600">
-            Set financial goals and get AI-powered recommendations
-          </p>
         </div>
 
         {error && (
-          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
-            <AlertCircle className="w-5 h-5 text-red-600" />
-            <p className="text-red-700">{error}</p>
+          <div className="bg-red-50 border border-red-200 p-4 rounded text-red-700 flex gap-2">
+            <AlertCircle /> {error}
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           {/* =======================
-              Goals column
+              LEFT – Goals
               ======================= */}
-          <div>
-            {/* Create goal */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h3 className="text-lg font-semibold mb-6">Create a Goal</h3>
+          <div className="xl:col-span-1 space-y-6">
+            {/* Create Goal */}
+            <div className="bg-white p-6 rounded-xl shadow-sm">
+              <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <Plus /> Create Goal
+              </h3>
 
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Goal name"
-                  value={newGoal.name}
-                  onChange={(e) =>
-                    setNewGoal({ ...newGoal, name: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border rounded-lg"
-                />
+              <input
+                className="input mb-2"
+                placeholder="Goal name"
+                value={newGoal.name}
+                onChange={(e) =>
+                  setNewGoal({ ...newGoal, name: e.target.value })
+                }
+              />
 
-                <input
-                  type="number"
-                  placeholder="Target amount"
-                  value={newGoal.target_amount}
-                  onChange={(e) =>
-                    setNewGoal({
-                      ...newGoal,
-                      target_amount: Number(e.target.value),
-                    })
-                  }
-                  className="w-full px-4 py-2 border rounded-lg"
-                />
+              <input
+                className="input mb-2"
+                type="number"
+                placeholder="Target amount"
+                value={newGoal.target_amount}
+                onChange={(e) =>
+                  setNewGoal({
+                    ...newGoal,
+                    target_amount: Number(e.target.value),
+                  })
+                }
+              />
 
-                <input
-                  type="date"
-                  value={newGoal.deadline}
-                  onChange={(e) =>
-                    setNewGoal({ ...newGoal, deadline: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border rounded-lg"
-                />
+              <input
+                className="input"
+                type="date"
+                value={newGoal.deadline}
+                onChange={(e) =>
+                  setNewGoal({ ...newGoal, deadline: e.target.value })
+                }
+              />
 
-                <select
-                  value={newGoal.priority}
-                  onChange={(e) =>
-                    setNewGoal({
-                      ...newGoal,
-                      priority: e.target.value as 'low' | 'medium' | 'high',
-                    })
-                  }
-                  className="w-full px-4 py-2 border rounded-lg"
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-
-                <button
-                  onClick={handleAddGoal}
-                  className="w-full bg-blue-600 text-white py-2 rounded-lg flex justify-center gap-2"
-                >
-                  <Plus className="w-4 h-4" /> Add Goal
-                </button>
-              </div>
+              <button
+                onClick={handleAddGoal}
+                className="btn-primary mt-4 w-full flex justify-center gap-2"
+              >
+                <Plus /> Add Goal
+              </button>
             </div>
 
-            {/* Goal list */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold mb-4">
+            {/* Goal List */}
+            <div className="bg-white p-6 rounded-xl shadow-sm">
+              <h3 className="font-semibold mb-4">
                 Your Goals ({goals.length})
               </h3>
 
-              {goals.length === 0 ? (
-                <p className="text-gray-600 text-center">
+              {goals.length === 0 && (
+                <p className="text-sm text-slate-500">
                   No goals added yet
                 </p>
-              ) : (
-                goals.map((goal, idx) => (
-                  <div
-                    key={idx}
-                    className="border rounded-lg p-4 mb-3 flex justify-between"
-                  >
-                    <div>
-                      <p className="font-semibold">{goal.name}</p>
-                      <p className="text-sm text-gray-600">
-                        ₹{goal.target_amount} by{' '}
-                        {new Date(goal.deadline).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <button onClick={() => handleRemoveGoal(idx)}>
-                      <X className="w-4 h-4 text-red-600" />
-                    </button>
-                  </div>
-                ))
               )}
+
+              {goals.map((g) => (
+                <div
+                  key={g.id}
+                  className="border rounded-lg p-4 mb-3 flex justify-between items-center"
+                >
+                  <div>
+                    <p className="font-semibold">{g.name}</p>
+                    <p className="text-sm text-slate-600">
+                      ₹{g.target_amount} •{' '}
+                      {new Date(g.deadline).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button onClick={() => handleDeleteGoal(g.id!)}>
+                    <X className="text-red-500" />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* =======================
-              Recommendations column
+              RIGHT – Analytics & AI
               ======================= */}
-          <div>
+          <div className="xl:col-span-2 space-y-6">
             <button
               onClick={handleGetRecommendations}
+              className="btn-primary w-full flex justify-center gap-2"
               disabled={loading}
-              className="w-full mb-6 bg-blue-600 text-white py-3 rounded-lg flex justify-center gap-2"
             >
-              {loading ? (
-                <Loader className="w-5 h-5 animate-spin" />
-              ) : (
-                <Sparkles className="w-5 h-5" />
-              )}
-              {loading ? 'Generating...' : 'Get AI Recommendations'}
+              {loading ? <Loader className="animate-spin" /> : <Sparkles />}
+              {loading ? 'Analyzing finances...' : 'Run Analytics'}
             </button>
 
-            {recommendations && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-lg font-semibold mb-4">
-                  AI Recommendations
+            {/* Metrics */}
+            {metrics && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <MetricCard label="Income" value={metrics.monthly_income} />
+                <MetricCard
+                  label="Expenses"
+                  value={metrics.monthly_expense}
+                />
+                <MetricCard
+                  label="Savings"
+                  value={metrics.monthly_savings}
+                />
+                <MetricCard
+                  label="Savings Rate"
+                  value={`${(metrics.savings_rate * 100).toFixed(1)}%`}
+                />
+              </div>
+            )}
+
+            {/* AI Insights */}
+            {recommendations?.recommendations?.goals && (
+              <div className="bg-white p-6 rounded-xl shadow-sm">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <TrendingUp /> AI Insights
                 </h3>
+                <ul className="list-disc pl-5 text-sm space-y-1">
+                  {recommendations.recommendations.goals.map((r, i) => (
+                    <li key={i}>{r.message}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-                {/* NEW structured recommendations */}
-                {renderBlock(
-                  'Critical alerts',
-                  recommendations.recommendations?.critical,
-                  'red'
-                )}
+            {/* Goal Evaluations */}
+            {safeGoalEvaluations.map((g, i) => (
+              <div
+                key={i}
+                className={`bg-white p-6 rounded-xl shadow-sm border ${
+                  g.feasible
+                    ? 'border-green-200'
+                    : 'border-yellow-200'
+                }`}
+              >
+                <div className="flex items-center gap-2 font-semibold mb-2">
+                  {g.feasible ? (
+                    <CheckCircle className="text-green-600" />
+                  ) : (
+                    <AlertTriangle className="text-yellow-600" />
+                  )}
+                  {g.goal}
+                </div>
 
-                {renderBlock(
-                  'Forecast insights',
-                  recommendations.recommendations?.forecast,
-                  'yellow'
-                )}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
+                  <Info label="Months Left" value={g.months_remaining} />
+                  <Info
+                    label="Required / mo"
+                    value={`₹${g.required_monthly_saving}`}
+                  />
+                  <Info
+                    label="Current / mo"
+                    value={`₹${g.current_monthly_saving}`}
+                  />
+                </div>
 
-                {renderBlock(
-                  'Goal insights',
-                  recommendations.recommendations?.goals,
-                  'green'
-                )}
-
-                {/* Goal evaluation math (unchanged) */}
-                {recommendations.goal_evaluations.map((g, idx) => (
-                  <div key={idx} className="mt-4 text-sm">
-                    {!g.feasible && (
-                      <p className="text-red-600 font-medium">
-                        ⚠ Goal "{g.goal}" is not feasible at current savings
-                      </p>
-                    )}
-                    <p>
-                      Required: ₹{g.required_monthly_saving}/month · Current:{' '}
-                      ₹{g.current_monthly_saving}/month
-                    </p>
+                {g.projection_series.length > 0 && (
+                  <div className="h-56 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={g.projection_series}>
+                        <XAxis dataKey="month" hide />
+                        <YAxis />
+                        <Tooltip />
+                        <Line
+                          type="monotone"
+                          dataKey="amount"
+                          stroke="#4f46e5"
+                          strokeWidth={2}
+                          dot={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
-                ))}
+                )}
               </div>
-            )}
-
-            {!loading && !recommendations && (
-              <div className="bg-blue-50 border rounded-lg p-6 text-center">
-                Click above to get AI-powered recommendations.
-              </div>
-            )}
+            ))}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* =======================
+   Small UI helpers
+   ======================= */
+
+function MetricCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | string;
+}) {
+  return (
+    <div className="bg-white p-4 rounded-xl shadow-sm">
+      <p className="text-sm text-slate-500">{label}</p>
+      <p className="text-xl font-semibold text-slate-800">
+        {typeof value === 'number' ? `₹${value}` : value}
+      </p>
+    </div>
+  );
+}
+
+function Info({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | string;
+}) {
+  return (
+    <div>
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="font-semibold">{value}</p>
     </div>
   );
 }

@@ -46,12 +46,14 @@ export interface InsightsData {
   message?: string;
 }
 
-export interface Goal {
+export type Goal = {
+  id?: number; // ✅ optional (important!)
   name: string;
   target_amount: number;
   deadline: string;
   priority: 'low' | 'medium' | 'high';
-}
+};
+
 
 export interface RecommendationsResponse {
   status: string;
@@ -115,23 +117,62 @@ export interface InsightsApiResponse {
 
   message?: string;
 }
+// ===== Goal engine & analytics =====
+
+export type StructuredRecommendation = {
+  message: string;
+  action?: string;
+  severity?: 'critical' | 'high' | 'medium' | 'low' | 'info';
+};
+
+export type ProjectionPoint = {
+  month: string;
+  amount: number;
+};
+
+export type GoalProjection = {
+  status: 'projected' | 'impossible';
+  achieved_by?: string;
+  months_before_deadline?: number;
+  overshoots_deadline?: boolean;
+  achieves_early?: boolean;
+};
+
+export type GoalEvaluation = {
+  goal: string;
+  feasible: boolean;
+  months_remaining: number;
+  required_monthly_saving: number;
+  current_monthly_saving: number;
+
+  projection?: GoalProjection;
+
+  // 📈 chart input (from backend)
+  projection_series?: ProjectionPoint[];
+};
+
+export type Metrics = {
+  monthly_income: number;
+  monthly_expense: number;
+  monthly_savings: number;
+  savings_rate: number;
+};
+
 export interface RecommendationsApiResponse {
-  actions: string[];
-  forecast_balance: number;
-  responses: string[];
-  goal_evaluations: Array<{
-    goal: string;
-    feasible: boolean;
-    months_remaining: number;
-    required_monthly_saving: number;
-    current_monthly_saving: number;
-  }>;
-  state: {
-    avg_monthly_income: number;
-    avg_monthly_expense: number;
-    current_balance: number;
-    liquidity_days: number;
-    savings_rate: number;
+  status: 'success' | 'no_data' | 'error';
+
+  // 📊 deterministic analytics
+  metrics?: Metrics;
+
+  // 🎯 goal math
+  goal_evaluations: GoalEvaluation[];
+
+  // 🧠 rules + LLM
+  recommendations?: {
+    goals?: StructuredRecommendation[];
   };
+
+  message?: string;
 }
+
 

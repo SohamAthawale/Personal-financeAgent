@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 
 from agent.user_profile import UserProfile
 from models import User
+from models import FinancialGoal
+from agent.goal_engine import FinancialGoal as FinancialGoalEngine
 
 # PDF intelligence
 from pdf_intelligence.stage1_layout import extract_layout
@@ -483,6 +485,9 @@ def generate_insights_view(
 # 4️⃣ AGENT
 # ==================================================
 def run_agent_view(*, db, user_id, goals=None):
+    # --------------------------------------------------
+    # 1️⃣ Fetch transactions
+    # --------------------------------------------------
     txns = (
         db.query(Transaction)
         .join(Statement)
@@ -493,20 +498,88 @@ def run_agent_view(*, db, user_id, goals=None):
     if not txns:
         return {
             "status": "no_data",
-            "message": "No transactions found"
+            "message": "No transactions found",
         }
 
+    # --------------------------------------------------
+    # 2️⃣ Convert to DataFrame + compute metrics
+    # --------------------------------------------------
     df = transactions_to_df(txns)
     metrics, df_txn = compute_metrics_from_df(df)
 
-    agent_result = run_agent(
-        df=df_txn,
-        metrics=metrics,
-        goals=goals
+    # --------------------------------------------------
+    # 3️⃣ Load remembered goals if none provided
+    # --------------------------------------------------
+    if goals is None:
+        db_goals = (
+            db.query(FinancialGoal)
+            .filter(
+                FinancialGoal.user_id == user_id,
+                FinancialGoal.is_active.is_(True),
+            )
+            .all()
+        )
+
+        goals = [
+            FinancialGoalEngine(
+                name=g.name,
+                target_amount=g.target_amount,
+                deadline=g.deadline,
+                priority=g.priority,
+            )
+            for g in db_goals
+        ]
+
+    # --------------------------------------------------
+    # 4️⃣ Deterministic goal evaluation (MATH ONLY)
+    # --------------------------------------------------
+    from agent.goal_engine import (
+        evaluate_goal,
+        goal_based_action,
+        build_goal_projection,
+    )
+    from agent.insights.goal_insights import generate_goal_insights
+
+    goal_evaluations = []
+    goal_actions = []
+
+    for goal in goals:
+        eval_result = evaluate_goal(goal, metrics)
+
+        # 📈 build chart-ready projection
+        projection_series = build_goal_projection(eval_result)
+
+        goal_evaluations.append({
+            **eval_result,
+            "projection_series": projection_series,
+        })
+
+        goal_actions.append(
+            goal_based_action(eval_result)
+        )
+
+    # --------------------------------------------------
+    # 5️⃣ LLM explanations (WORDS ONLY)
+    # --------------------------------------------------
+    llm_goal_insights = generate_goal_insights(
+        goal_evaluations,
+        force_refresh=False,
     )
 
-    # 🆕 Explicit success wrapper (non-breaking)
+    # --------------------------------------------------
+    # 6️⃣ Final response (UI + charts ready)
+    # --------------------------------------------------
     return {
         "status": "success",
-        **agent_result
+
+        # 📊 overall analytics (optional dashboard use)
+        "metrics": metrics,
+
+        # 🎯 per-goal math + timelines (GRAPH INPUT)
+        "goal_evaluations": goal_evaluations,
+
+        # 🧠 recommendations (rules + LLM)
+        "recommendations": {
+            "goals": goal_actions + llm_goal_insights
+        },
     }
