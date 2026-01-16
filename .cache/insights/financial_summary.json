@@ -1,97 +1,207 @@
 {
-  "fingerprint": "9fd298eacca7788aa8b93a13aff70c0faf2afa7e442e3380d0f2c2615714ed99",
+  "fingerprint": "49f0f8b77db071986423805f9d40c4455714f2c6c55e30cbb21b31904408edcc",
   "metrics": {
-    "total_income": 22168.0,
-    "total_expense": 16980.14,
-    "net_cashflow": 5187.86,
-    "monthly_income": 22168.0,
-    "monthly_expense": 16980.14,
-    "monthly_savings": 5187.86,
-    "savings_rate": 0.234,
+    "total_income": 332499.73,
+    "total_expense": 333479.37,
+    "net_cashflow": -979.64,
+    "monthly_income": 332499.73,
+    "monthly_expense": 333479.37,
+    "monthly_savings": 0.0,
+    "savings_rate": 0.0,
     "monthly_cashflow": [
       {
+        "month": "2024-12",
+        "amount": -330.0
+      },
+      {
+        "month": "2025-01",
+        "amount": 17250.87
+      },
+      {
+        "month": "2025-02",
+        "amount": -14808.19
+      },
+      {
+        "month": "2025-03",
+        "amount": -3008.22
+      },
+      {
+        "month": "2025-04",
+        "amount": 2317.32
+      },
+      {
+        "month": "2025-05",
+        "amount": 2264.09
+      },
+      {
+        "month": "2025-06",
+        "amount": -4673.63
+      },
+      {
+        "month": "2025-07",
+        "amount": 9536.22
+      },
+      {
+        "month": "2025-08",
+        "amount": -8793.96
+      },
+      {
+        "month": "2025-09",
+        "amount": 2139.7
+      },
+      {
+        "month": "2025-10",
+        "amount": -2142.19
+      },
+      {
         "month": "2025-11",
-        "amount": 5000.6
+        "amount": 2523.0
       },
       {
         "month": "2025-12",
-        "amount": 187.26
+        "amount": -3254.65
       }
     ],
     "monthly_timeseries": [
       {
+        "month": "2024-12",
+        "income": 2108.0,
+        "expense": 2438.0,
+        "savings": -330.0
+      },
+      {
+        "month": "2025-01",
+        "income": 96870.0,
+        "expense": 79619.13,
+        "savings": 17250.87
+      },
+      {
+        "month": "2025-02",
+        "income": 19956.0,
+        "expense": 34764.19,
+        "savings": -14808.19
+      },
+      {
+        "month": "2025-03",
+        "income": 19682.0,
+        "expense": 22690.22,
+        "savings": -3008.22
+      },
+      {
+        "month": "2025-04",
+        "income": 23874.0,
+        "expense": 21556.68,
+        "savings": 2317.32
+      },
+      {
+        "month": "2025-05",
+        "income": 21410.0,
+        "expense": 19145.91,
+        "savings": 2264.09
+      },
+      {
+        "month": "2025-06",
+        "income": 8722.0,
+        "expense": 13395.63,
+        "savings": -4673.63
+      },
+      {
+        "month": "2025-07",
+        "income": 42842.0,
+        "expense": 33305.78,
+        "savings": 9536.22
+      },
+      {
+        "month": "2025-08",
+        "income": 13906.0,
+        "expense": 22699.96,
+        "savings": -8793.96
+      },
+      {
+        "month": "2025-09",
+        "income": 26496.68,
+        "expense": 24356.98,
+        "savings": 2139.7
+      },
+      {
+        "month": "2025-10",
+        "income": 15676.0,
+        "expense": 17818.19,
+        "savings": -2142.19
+      },
+      {
         "month": "2025-11",
-        "income": 7828.0,
-        "expense": 2827.4,
-        "savings": 5000.6
+        "income": 22596.0,
+        "expense": 20073.0,
+        "savings": 2523.0
       },
       {
         "month": "2025-12",
-        "income": 14340.0,
-        "expense": 14152.74,
-        "savings": 187.26
+        "income": 18361.05,
+        "expense": 21615.7,
+        "savings": -3254.65
       }
     ],
     "avg_confidence": 1.0,
     "top_upi_counterparties": [
       {
-        "upi_id": "ali-6000764644@mbkns",
+        "upi_id": "ARUNDHATI CHAIT_502718546604",
         "transaction_count": 1,
-        "total_amount": 999.33
+        "total_amount": 60000.0
       },
       {
-        "upi_id": "upi-zomato-payzomato@hdfcbank",
+        "upi_id": "JM FINANCIAL MU_503746883523",
         "transaction_count": 1,
-        "total_amount": 154.4
+        "total_amount": 15000.0
       },
       {
-        "upi_id": "uts-bdpg2.iruts@sbi",
-        "transaction_count": 5,
-        "total_amount": 140.0
+        "upi_id": "ARUNDHATI CHAIT_289041367681",
+        "transaction_count": 1,
+        "total_amount": 8000.0
       },
       {
-        "upi_id": "mishra-q670548581@ybl",
+        "upi_id": "KALMIT SANDEEP_521086178748",
         "transaction_count": 1,
-        "total_amount": 135.0
+        "total_amount": 7000.0
       },
       {
-        "upi_id": "singh-9165930435@pthdfc",
+        "upi_id": "RUPALI MILIND J_387205268231",
         "transaction_count": 1,
-        "total_amount": 120.0
+        "total_amount": 7000.0
       },
       {
-        "upi_id": "uts-bdpg.iruts@sbi",
+        "upi_id": "RUPALI MILIND J_688409309480",
         "transaction_count": 1,
-        "total_amount": 30.0
+        "total_amount": 7000.0
       },
       {
-        "upi_id": "-q776683357@ybl",
+        "upi_id": "ARUNDHATI CHAIT_392351811296",
         "transaction_count": 1,
-        "total_amount": 25.0
+        "total_amount": 6150.0
       },
       {
-        "upi_id": "g-9022404301@okbi",
+        "upi_id": "SOHAMATHAWALE20_571967941956",
         "transaction_count": 1,
-        "total_amount": 25.0
+        "total_amount": 5500.0
       },
       {
-        "upi_id": "and-q841366868@ybl",
+        "upi_id": "CHAITANYA PRAKA_570026931076",
         "transaction_count": 1,
-        "total_amount": 20.0
+        "total_amount": 5200.0
       },
       {
-        "upi_id": "fruit-gpay-11172643035@okb",
+        "upi_id": "ARUNDHATI CHAIT_512706647493",
         "transaction_count": 1,
-        "total_amount": 20.0
+        "total_amount": 5000.0
       }
     ],
     "_audit": {
-      "transaction_count": 121,
-      "sum_deposits": 22168.0,
-      "sum_withdrawals": 16980.14,
+      "transaction_count": 2470,
+      "sum_deposits": 332499.73,
+      "sum_withdrawals": 333479.37,
       "llm_backfilled": 0
     }
   },
-  "model": "llama3",
-  "content": "Based on the provided metrics, here are the requested summaries:\n\n**Income, Expense, Net Cashflow Summary:**\n\n* Total Income: 22168.0\n* Total Expense: 16980.14\n* Net Cashflow: 5187.86\n\n**Cashflow Health:**\n\nThe net cashflow of 5187.86 indicates a High level of cashflow health.\n\nNote: I have not computed or inferred any numbers, and only restated the provided totals verbatim."
+  "model": "qwen2.5:7b-instruct",
+  "content": "1. Income, expense, net cashflow summary:\n   - Total income: 332499.73\n   - Total expense: 333479.37\n   - Net cashflow: -979.64\n\n2. Cashflow health: Low"
 }

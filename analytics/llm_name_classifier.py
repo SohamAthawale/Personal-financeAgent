@@ -84,7 +84,7 @@ Output:
         resp = requests.post(
             OLLAMA_URL,
             json={
-                "model": LLM_MODEL,
+                "model": "qwen2.5:1.5b",
                 "prompt": prompt,
                 "stream": False,
                 "options": {

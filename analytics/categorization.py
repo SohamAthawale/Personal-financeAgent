@@ -73,7 +73,19 @@ STRUCTURAL_HINTS = [
     "phonepe",
 ]
 
-
+# 🚧 Strong business indicators — never personal transfers
+STRONG_BUSINESS_KEYWORDS = {
+    "corporation",
+    "corp",
+    "india",
+    "ltd",
+    "limited",
+    "pvt",
+    "private",
+    "priv",
+    "company",
+    "co ",
+}
 # ==================================================
 # CORE CATEGORIZATION LOGIC
 # ==================================================
@@ -88,6 +100,8 @@ def categorize_transaction(
 
     text = normalize_text(description, merchant)
     merchant_l = merchant.lower()
+
+    is_strong_business = any(k in merchant_l for k in STRONG_BUSINESS_KEYWORDS)
 
     # 1️⃣ INCOME
     if amount > 0:
@@ -151,9 +165,11 @@ def categorize_transaction(
         return llm_category, llm_confidence, "llm-weak"
 
     # 7️⃣ FINAL FALLBACK
-    if llm_is_business(merchant):
-        return "Misc Businesses", 0.55, "fallback"
-
+    if llm_category in {"Food", "Medical", "Transport", "Bills", "Subscriptions", "Shopping"}:
+        return llm_category, max(llm_confidence, 0.65), "llm-accepted"
+    if is_strong_business:
+        return "Misc Businesses", 0.65, "business-guard"
+    
     return "Personal Transfers", 0.55, "fallback"
 
 
