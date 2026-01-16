@@ -4,6 +4,8 @@ import {
   AlertCircle,
   CheckCircle,
   Loader,
+  Info,
+  Pencil,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -15,8 +17,8 @@ import { useAuth } from '../context/AuthContext';
 interface UploadStatus {
   status: 'idle' | 'uploading' | 'success' | 'error';
   progress: number;
+  stage?: 'upload' | 'parse' | 'classify';
   message: string;
-  transactionCount?: number;
 }
 
 interface Transaction {
@@ -29,6 +31,12 @@ interface Transaction {
   confidence: number;
   needs_review: boolean;
   corrected: boolean;
+}
+
+interface ExplainResponse {
+  reasoning: string;
+  rules_fired: string[];
+  model_confidence: number;
 }
 
 /* =======================
@@ -45,18 +53,17 @@ export function Dashboard() {
   });
 
   const [dragActive, setDragActive] = useState(false);
-
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loadingTx, setLoadingTx] = useState(false);
 
-  const [explainTx, setExplainTx] = useState<any | null>(null);
+  const [explainTx, setExplainTx] = useState<ExplainResponse | null>(null);
   const [editTx, setEditTx] = useState<Transaction | null>(null);
   const [editCategory, setEditCategory] = useState('');
   const [editMerchant, setEditMerchant] = useState('');
   const [remember, setRemember] = useState(true);
 
   /* =======================
-     Fetch transactions
+     Fetch Transactions
      ======================= */
 
   const fetchTransactions = async () => {
@@ -77,7 +84,7 @@ export function Dashboard() {
   }, [auth?.token]);
 
   /* =======================
-     Upload handler
+     Upload Handler
      ======================= */
 
   const handleFile = async (file: File) => {
@@ -85,7 +92,7 @@ export function Dashboard() {
       setUploadStatus({
         status: 'error',
         progress: 0,
-        message: 'Please upload a PDF file',
+        message: 'Only PDF files are supported',
       });
       return;
     }
@@ -95,20 +102,38 @@ export function Dashboard() {
     try {
       setUploadStatus({
         status: 'uploading',
-        progress: 0,
-        message: 'Uploading and parsing statement...',
+        progress: 10,
+        stage: 'upload',
+        message: 'Uploading statement...',
       });
 
       const result = await api.uploadStatement(
         file,
         auth.token,
-        (progress) => {
-          setUploadStatus((prev) => ({
-            ...prev,
-            progress: Math.round(progress),
-          }));
-        }
+        (progress) =>
+          setUploadStatus((p) => ({
+            ...p,
+            progress: Math.min(30, Math.round(progress)),
+          }))
       );
+
+      setUploadStatus({
+        status: 'uploading',
+        progress: 60,
+        stage: 'parse',
+        message: 'Parsing transactions...',
+      });
+
+      await new Promise((r) => setTimeout(r, 600));
+
+      setUploadStatus({
+        status: 'uploading',
+        progress: 85,
+        stage: 'classify',
+        message: 'Running AI classification...',
+      });
+
+      await new Promise((r) => setTimeout(r, 600));
 
       if (result.status === 'success') {
         setUploadStatus({
@@ -116,12 +141,11 @@ export function Dashboard() {
           progress: 100,
           message: `Parsed ${result.transactions_count || 0} transactions`,
         });
-
         await fetchTransactions();
-
-        setTimeout(() => {
-          setUploadStatus({ status: 'idle', progress: 0, message: '' });
-        }, 2500);
+        setTimeout(
+          () => setUploadStatus({ status: 'idle', progress: 0, message: '' }),
+          2500
+        );
       } else {
         throw new Error(result.message);
       }
@@ -135,13 +159,14 @@ export function Dashboard() {
   };
 
   /* =======================
-     Drag & drop
+     Drag & Drop
      ======================= */
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragActive(e.type !== 'dragleave');
+    if (e.type === 'dragenter') setDragActive(true);
+    if (e.type === 'dragleave') setDragActive(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -157,8 +182,12 @@ export function Dashboard() {
 
   const openExplain = async (id: number) => {
     if (!auth?.token) return;
-    const res = await api.explainTransaction(id, auth.token);
-    setExplainTx(res);
+    try {
+      const res = await api.explainTransaction(id, auth.token);
+      setExplainTx(res);
+    } catch {
+      alert('Failed to fetch explanation');
+    }
   };
 
   const openEdit = (tx: Transaction) => {
@@ -185,7 +214,7 @@ export function Dashboard() {
               ...t,
               merchant: editMerchant,
               category: editCategory,
-              confidence: 1.0,
+              confidence: 1,
               corrected: true,
               needs_review: false,
             }
@@ -202,24 +231,26 @@ export function Dashboard() {
 
   if (!auth) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Please log in.</p>
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        Please log in.
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+    <div className="min-h-screen bg-gray-50 p-8 max-w-7xl mx-auto space-y-8">
+      <h1 className="text-3xl font-bold">Financial Dashboard</h1>
 
-      {/* Upload */}
+      {/* Upload Card */}
       <div
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-lg p-10 text-center mb-8 ${
-          dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white'
+        className={`rounded-xl border-2 border-dashed p-10 text-center transition ${
+          dragActive
+            ? 'border-blue-500 bg-blue-50'
+            : 'border-gray-300 bg-white'
         }`}
       >
         <input
@@ -229,15 +260,15 @@ export function Dashboard() {
           className="hidden"
           onChange={(e) => e.target.files && handleFile(e.target.files[0])}
         />
-        <Upload className="w-10 h-10 mx-auto mb-2 text-gray-400" />
+        <Upload className="w-10 h-10 mx-auto text-gray-400 mb-3" />
         <label htmlFor="file" className="cursor-pointer text-blue-600">
-          Upload bank statement PDF
+          Upload bank statement (PDF)
         </label>
 
         {uploadStatus.status === 'uploading' && (
-          <div className="mt-4">
-            <Loader className="animate-spin mx-auto" />
-            <p>{uploadStatus.progress}%</p>
+          <div className="mt-4 text-sm text-gray-600">
+            <Loader className="animate-spin mx-auto mb-2" />
+            {uploadStatus.message}
           </div>
         )}
 
@@ -251,19 +282,25 @@ export function Dashboard() {
       </div>
 
       {/* Transactions */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-xl shadow p-6">
         <h2 className="font-semibold mb-4">Transactions</h2>
 
-        {loadingTx ? (
-          <p>Loading...</p>
-        ) : (
+        {loadingTx && <p>Loading transactions...</p>}
+
+        {!loadingTx && transactions.length === 0 && (
+          <p className="text-sm text-gray-500 text-center">
+            No transactions yet. Upload a statement to begin.
+          </p>
+        )}
+
+        {transactions.length > 0 && (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b">
+              <tr className="border-b text-left">
                 <th>Date</th>
                 <th>Description</th>
                 <th>Category</th>
-                <th>Amount</th>
+                <th className="text-right">Amount</th>
                 <th>Confidence</th>
                 <th />
               </tr>
@@ -281,20 +318,28 @@ export function Dashboard() {
                   <td>{tx.category}</td>
                   <td className="text-right">{tx.amount.toFixed(2)}</td>
                   <td>
-                    {(tx.confidence * 100).toFixed(0)}%
+                    <span
+                      className={`px-2 py-1 rounded text-xs ${
+                        tx.confidence > 0.9
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}
+                    >
+                      {(tx.confidence * 100).toFixed(0)}%
+                    </span>
                   </td>
-                  <td className="space-x-2 text-right">
+                  <td className="text-right space-x-2">
                     <button
                       onClick={() => openExplain(tx.id)}
-                      className="text-blue-600 text-xs"
+                      className="text-blue-600 text-xs inline-flex items-center gap-1"
                     >
-                      Explain
+                      <Info size={12} /> Explain
                     </button>
                     <button
                       onClick={() => openEdit(tx)}
-                      className="text-gray-600 text-xs"
+                      className="text-gray-600 text-xs inline-flex items-center gap-1"
                     >
-                      Edit
+                      <Pencil size={12} /> Edit
                     </button>
                   </td>
                 </tr>
@@ -304,7 +349,7 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* Explain Modal */}
+      {/* Modals */}
       {explainTx && (
         <Modal onClose={() => setExplainTx(null)}>
           <pre className="text-xs bg-gray-100 p-4 rounded">
@@ -313,10 +358,9 @@ export function Dashboard() {
         </Modal>
       )}
 
-      {/* Edit Modal */}
       {editTx && (
         <Modal onClose={() => setEditTx(null)}>
-          <h3 className="font-semibold mb-2">Edit Transaction</h3>
+          <h3 className="font-semibold mb-3">Edit Transaction</h3>
           <input
             className="border p-2 w-full mb-2"
             value={editMerchant}
@@ -327,7 +371,7 @@ export function Dashboard() {
             value={editCategory}
             onChange={(e) => setEditCategory(e.target.value)}
           />
-          <label className="text-sm flex items-center gap-2">
+          <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={remember}
@@ -348,7 +392,7 @@ export function Dashboard() {
 }
 
 /* =======================
-   Modal helper
+   Modal
    ======================= */
 
 function Modal({
@@ -358,12 +402,18 @@ function Modal({
   children: React.ReactNode;
   onClose: () => void;
 }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg max-w-lg w-full">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl p-6 max-w-lg w-full">
         {children}
         <div className="text-right mt-4">
-          <button onClick={onClose} className="text-blue-600">
+          <button onClick={onClose} className="text-blue-600 text-sm">
             Close
           </button>
         </div>

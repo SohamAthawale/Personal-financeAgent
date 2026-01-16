@@ -34,7 +34,6 @@ MERCHANT_OVERRIDES = {
     "dominos": "Food",
     "kfc": "Food",
     "pizza": "Food",
-
     # ------------------------------
     # Telecom / Bills
     # ------------------------------

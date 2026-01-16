@@ -1,6 +1,7 @@
 # analytics/llm_name_classifier.py
 
 import json
+import re
 import requests
 from functools import lru_cache
 
@@ -112,3 +113,81 @@ Output:
     except Exception:
         # Fail-safe: assume BUSINESS
         return True
+
+
+# ==================================================
+# 🔥 ADDITIONS BELOW (NO EXISTING CODE MODIFIED)
+# ==================================================
+
+# ---- NEW: deterministic heuristics (fast & free) ----
+
+PERSON_NAME_RX = re.compile(
+    r"^[A-Z][a-z]+(\s+[A-Z][a-z]+){0,2}$"
+)
+
+BUSINESS_KEYWORDS = {
+    "store", "shop", "mart", "hotel", "restaurant", "cafe",
+    "enterprise", "enterprises", "traders", "services",
+    "foods", "food", "medical", "pharmacy", "chemist",
+    "limited", "ltd", "pvt", "private", "company", "co",
+}
+
+def heuristic_is_business(name: str) -> tuple[bool | None, float]:
+    """
+    Cheap deterministic classifier.
+    Returns (is_business, confidence) or (None, 0.0)
+    """
+    if not name:
+        return None, 0.0
+
+    n = name.lower().strip()
+
+    for kw in BUSINESS_KEYWORDS:
+        if kw in n:
+            return True, 0.9
+
+    if PERSON_NAME_RX.match(name.strip()):
+        return False, 0.8
+
+    return None, 0.0
+
+
+# ---- NEW: smart wrapper (heuristics → LLM) ----
+
+def smart_is_business(name: str) -> tuple[bool, float, str]:
+    """
+    Unified entrypoint for name classification.
+
+    Order:
+    1. Heuristic (fast, deterministic)
+    2. LLM fallback
+
+    Returns:
+    (is_business, confidence, source)
+    """
+
+    # 1️⃣ Heuristic short-circuit
+    h_result, h_conf = heuristic_is_business(name)
+    if h_result is not None:
+        return h_result, h_conf, "heuristic"
+
+    # 2️⃣ LLM fallback
+    result = llm_is_business(name)
+    return result, 0.75, "llm"
+
+
+# ---- NEW: convenience helpers ----
+
+def is_person(name: str) -> bool:
+    """
+    Finance-safe helper.
+    """
+    return not smart_is_business(name)[0]
+
+
+def name_classification_confidence(name: str) -> float:
+    """
+    Returns confidence score for classification.
+    """
+    _, conf, _ = smart_is_business(name)
+    return conf

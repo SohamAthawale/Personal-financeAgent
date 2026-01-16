@@ -4,7 +4,11 @@ from typing import Tuple, Optional
 
 from agent.categories import CATEGORIES
 from analytics.merchant_normalizer import normalize_merchant
-from analytics.llm_categorizer import llm_categorize_merchant
+from analytics.llm_categorizer import (
+    llm_categorize_merchant,
+    looks_like_person_name,
+    is_micro_consumable,
+)
 from analytics.llm_name_classifier import llm_is_business
 from analytics.merchant_memory import lookup_merchant_category
 
@@ -55,46 +59,19 @@ MANDATE_KEYWORDS = [
     "bandhan",
 ]
 
-# Prevent TRENT → RENT false positives
 RENT_REGEX = re.compile(r"\b(rent|lease)\b", re.I)
 
-
-# ==================================================
-# PAYMENT RAIL METADATA
-# ==================================================
-
-RAIL_REGEX = {
-    "UPI": re.compile(r"\bupi\b", re.I),
-    "NEFT": re.compile(r"\bneft\b", re.I),
-    "IMPS": re.compile(r"\bimps\b", re.I),
-    "RTGS": re.compile(r"\brtgs\b", re.I),
-}
-
-
-def detect_payment_rail(description: str) -> str:
-    text = (description or "").lower()
-    for rail, rx in RAIL_REGEX.items():
-        if rx.search(text):
-            return rail
-    return "OTHER"
-
-
-# ==================================================
-# LLM FALLBACK UPGRADE
-# ==================================================
-
-def upgrade_fallback_category(
-    amount: float,
-    llm_category: str,
-    llm_confidence: float,
-) -> Optional[str]:
-    """
-    Promote medium-confidence large spends
-    """
-    if abs(amount) >= 1000 and llm_confidence >= 0.60:
-        if llm_category in {"Shopping", "Food", "Medical"}:
-            return llm_category
-    return None
+# 🚧 Structural non-person indicators
+STRUCTURAL_HINTS = [
+    "metro",
+    "railway",
+    "irct",
+    "uts",
+    "pos ",
+    "paytm",
+    "gpay",
+    "phonepe",
+]
 
 
 # ==================================================
@@ -106,9 +83,11 @@ def categorize_transaction(
     merchant: str,
     upi_id: str,
     amount: float,
+    llm_cache: dict,
 ) -> Tuple[str, float, str]:
 
     text = normalize_text(description, merchant)
+    merchant_l = merchant.lower()
 
     # 1️⃣ INCOME
     if amount > 0:
@@ -127,15 +106,30 @@ def categorize_transaction(
     if contains_any(text, MANDATE_KEYWORDS):
         return "Investments/Mandates", 0.95, "rule"
 
-    # 5️⃣ RENT (SAFE WORD BOUNDARY)
+    # 5️⃣ RENT
     if RENT_REGEX.search(text):
         return "Rent", 0.95, "rule"
 
-    # 6️⃣ LLM PRIMARY
-    llm_category, llm_confidence = llm_categorize_merchant(merchant)
+    # 6️⃣ LLM (CACHED)
+    llm_category, llm_confidence = llm_cache.get(
+        merchant, ("Other", 0.0)
+    )
 
+    # 🧃 MICRO-CONSUMABLE CORRECTION
+    if is_micro_consumable(llm_category, amount):
+        return "Food", 0.85, "micro-consumable"
+
+    # ✅ STRONG LLM ACCEPTANCE
     if llm_confidence >= 0.80 and llm_category in CATEGORIES:
-        # persist knowledge if available
+
+        # 🚫 Never treat structural merchants as people
+        if (
+            looks_like_person_name(merchant)
+            and abs(amount) >= 500
+            and not any(h in merchant_l for h in STRUCTURAL_HINTS)
+        ):
+            return "Personal Transfers", 0.75, "person-override"
+
         if save_merchant_category:
             try:
                 save_merchant_category(
@@ -146,16 +140,17 @@ def categorize_transaction(
             except Exception:
                 pass
 
-        return llm_category, llm_confidence, "llm"
+        return llm_category, llm_confidence, "llm-strong"
 
-    # 6.5️⃣ UPGRADE LARGE MEDIUM-CONFIDENCE SPENDS
-    upgraded = upgrade_fallback_category(
-        amount, llm_category, llm_confidence
-    )
-    if upgraded:
-        return upgraded, llm_confidence, "llm-upgrade"
+    # 🟡 WEAK BUT USABLE LLM (LOCAL MERCHANTS)
+    if (
+        0.60 <= llm_confidence < 0.80
+        and llm_category in {"Food", "Shopping", "Medical", "Transport", "Bills", "Subscriptions"}
+        and llm_is_business(merchant)
+    ):
+        return llm_category, llm_confidence, "llm-weak"
 
-    # 7️⃣ FINAL FALLBACK (CRITICAL SPLIT)
+    # 7️⃣ FINAL FALLBACK
     if llm_is_business(merchant):
         return "Misc Businesses", 0.55, "fallback"
 
@@ -163,7 +158,7 @@ def categorize_transaction(
 
 
 # ==================================================
-# APPLY TO DATAFRAME
+# APPLY TO DATAFRAME (BATCHED LLM CALLS)
 # ==================================================
 
 def add_categories(df: pd.DataFrame) -> pd.DataFrame:
@@ -178,7 +173,11 @@ def add_categories(df: pd.DataFrame) -> pd.DataFrame:
     )
     df["upi_id"] = merchant_data.apply(lambda x: x.get("upi_id"))
 
-    df["payment_rail"] = df["description"].apply(detect_payment_rail)
+    unique_merchants = df["merchant"].unique()
+    llm_cache = {
+        m: llm_categorize_merchant(m)
+        for m in unique_merchants if m
+    }
 
     results = df.apply(
         lambda row: categorize_transaction(
@@ -186,6 +185,7 @@ def add_categories(df: pd.DataFrame) -> pd.DataFrame:
             row["merchant"],
             row["upi_id"],
             row["amount"],
+            llm_cache,
         ),
         axis=1,
         result_type="expand",
@@ -195,11 +195,12 @@ def add_categories(df: pd.DataFrame) -> pd.DataFrame:
     df["category_confidence"] = results[1]
     df["category_source"] = results[2]
 
-    # ✅ FIXED SAFETY CLAMP
     allowed = set(CATEGORIES) | {
+        "Income",
         "Self Transfer",
         "Personal Transfers",
         "Misc Businesses",
+        "Investments/Mandates",
     }
 
     df.loc[~df["category"].isin(allowed), "category"] = "Other"
@@ -212,9 +213,6 @@ def add_categories(df: pd.DataFrame) -> pd.DataFrame:
 # ==================================================
 
 def category_summary(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    TRUE discretionary expense view
-    """
     expense_df = df[
         (df["amount"] < 0)
         & (~df["category"].isin([
@@ -223,6 +221,9 @@ def category_summary(df: pd.DataFrame) -> pd.DataFrame:
             "Personal Transfers",
         ]))
     ].copy()
+
+    if expense_df.empty:
+        return pd.DataFrame(columns=["category", "expense"])
 
     expense_df["expense"] = expense_df["amount"].abs()
 
@@ -236,13 +237,13 @@ def category_summary(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def category_summary_all_debits(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Account truth: everything except income
-    """
     debit_df = df[
         (df["amount"] < 0)
         & (df["category"] != "Income")
     ].copy()
+
+    if debit_df.empty:
+        return pd.DataFrame(columns=["category", "amount_out"])
 
     debit_df["amount_out"] = debit_df["amount"].abs()
 

@@ -2,6 +2,10 @@
 
 import re
 
+# =====================================================
+# EXISTING CODE (UNCHANGED)
+# =====================================================
+
 # Common noise tokens in bank narrations
 NOISE_TOKENS = [
     "upi", "neft", "imps", "rtgs",
@@ -68,3 +72,67 @@ def normalize_merchant(description: str) -> dict:
         "merchant_name": normalize_text(desc).upper(),
         "upi_id": upi_id
     }
+
+# =====================================================
+# 🔥 ADDITIONS BELOW — ZERO BREAKING CHANGES
+# =====================================================
+
+# ---- NEW: location / branch noise handling ----
+LOCATION_SUFFIXES = {
+    "blr", "bengaluru", "bangalore",
+    "mum", "mumbai",
+    "del", "delhi",
+    "hyd", "hyderabad",
+    "chn", "chennai",
+    "kol", "kolkata",
+    "pune"
+}
+
+def canonicalize_merchant_name(name: str) -> str:
+    """
+    Generates a stable merchant key for:
+    - merchant_memory
+    - rule engine
+    - analytics
+    Does NOT replace merchant_name.
+    """
+    if not name or name == "UNKNOWN":
+        return "unknown"
+
+    n = name.lower()
+
+    # normalize separators
+    n = re.sub(r"[._\-]", " ", n)
+
+    parts = []
+    for p in n.split():
+        if p in LOCATION_SUFFIXES:
+            continue
+        if len(p) <= 2:
+            continue
+        parts.append(p)
+
+    return parts[0] if parts else "unknown"
+
+
+def enrich_normalized_merchant(result: dict) -> dict:
+    """
+    ADD-ON ENRICHMENT FUNCTION
+    Call this AFTER normalize_merchant()
+
+    Adds:
+    - merchant_key (canonical, memory-safe)
+    - raw_merchant (debug/audit)
+    """
+
+    merchant_name = result.get("merchant_name", "UNKNOWN")
+    upi_id = result.get("upi_id")
+
+    base = merchant_name
+    if upi_id and "@" in upi_id:
+        base = upi_id.split("@")[0]
+
+    result["merchant_key"] = canonicalize_merchant_name(base)
+    result["raw_merchant"] = merchant_name
+
+    return result

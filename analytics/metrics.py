@@ -128,3 +128,85 @@ def compute_metrics_from_df(df: pd.DataFrame):
     }
 
     return metrics, df_txn
+
+
+# ==================================================
+# 🔥 ADDITIONS BELOW (NO EXISTING CODE MODIFIED)
+# ==================================================
+
+# ---- NEW: data quality diagnostics ----
+
+def compute_data_quality_metrics(df: pd.DataFrame) -> dict:
+    """
+    Returns diagnostics about data health & trustworthiness.
+    Purely additive — does not affect financial metrics.
+    """
+    if df.empty:
+        return {
+            "row_count": 0,
+            "txn_rows": 0,
+            "opening_balance_rows": 0,
+            "avg_confidence": 0.0,
+        }
+
+    opening_mask = df.apply(is_opening_balance_row, axis=1)
+
+    return {
+        "row_count": int(len(df)),
+        "txn_rows": int((~opening_mask).sum()),
+        "opening_balance_rows": int(opening_mask.sum()),
+        "avg_confidence": round(float(df["confidence"].mean()), 3),
+    }
+
+
+# ---- NEW: category-level expense breakdown (optional) ----
+
+def compute_category_expense_summary(
+    df: pd.DataFrame,
+    category_col: str = "category",
+) -> pd.DataFrame:
+    """
+    Aggregates expenses by category.
+    Safe no-op if category column is missing.
+    """
+    if df.empty or category_col not in df.columns:
+        return pd.DataFrame(
+            columns=[category_col, "total_expense", "transaction_count"]
+        )
+
+    df_exp = df[df["withdrawal"] > 0].copy()
+
+    if df_exp.empty:
+        return pd.DataFrame(
+            columns=[category_col, "total_expense", "transaction_count"]
+        )
+
+    summary = (
+        df_exp
+        .groupby(category_col, as_index=False)
+        .agg(
+            total_expense=("withdrawal", "sum"),
+            transaction_count=("withdrawal", "count"),
+        )
+        .sort_values("total_expense", ascending=False)
+    )
+
+    return summary.round(2)
+
+
+# ---- NEW: high-level KPI helper ----
+
+def compute_kpis(df: pd.DataFrame) -> dict:
+    """
+    Thin wrapper around compute_metrics_from_df
+    for UI or API endpoints that only need KPIs.
+    """
+    metrics, _ = compute_metrics_from_df(df)
+
+    return {
+        "income": metrics["total_income"],
+        "expense": metrics["total_expense"],
+        "savings": metrics["monthly_savings"],
+        "savings_rate": metrics["savings_rate"],
+        "avg_confidence": metrics["avg_confidence"],
+    }
