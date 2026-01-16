@@ -2,11 +2,11 @@
 
 import json
 import hashlib
-from typing import Any, Dict
+from typing import Any, Dict, List
 from pathlib import Path
 
 # ==================================================
-# BACKEND CONFIG
+# LLM CONFIG
 # ==================================================
 try:
     from config.llm import LLM_ENABLED, LLM_MODEL
@@ -22,152 +22,256 @@ from agent.insights.utils import make_json_safe, call_llm
 CACHE_DIR = Path(".cache/insights")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-CACHE_FILE = CACHE_DIR / "financial_summary.json"
+
+def _cache_file(namespace: str) -> Path:
+    return CACHE_DIR / f"financial_summary_{namespace}.json"
+
 
 # ==================================================
-# SYSTEM PROMPT (STRICT, METRIC-LOCKED)
+# PROMPT
 # ==================================================
 SYSTEM_PROMPT = """
 You are a financial reporting assistant.
 
 STRICT RULES:
-- Use ONLY the provided metrics
-- Restate totals verbatim
-- Do NOT mention transactions
+- Use ONLY the provided data
 - Do NOT compute or infer numbers
+- Do NOT classify or judge
+- Restate values verbatim
 """
 
 
 # ==================================================
-# HELPERS
+# FINGERPRINT
 # ==================================================
-def _fingerprint_metrics(metrics: Dict[str, Any]) -> str:
-    """
-    Stable fingerprint of authoritative metrics.
-    """
-    blob = json.dumps(
-        metrics,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    return hashlib.sha256(blob.encode()).hexdigest()
-
-
-def _load_cache() -> Dict[str, Any] | None:
-    if not CACHE_FILE.exists():
-        return None
-    try:
-        return json.loads(CACHE_FILE.read_text())
-    except Exception:
-        return None
-
-
-def _save_cache(payload: Dict[str, Any]) -> None:
-    CACHE_FILE.write_text(json.dumps(payload, indent=2))
+def _fingerprint(data: Dict[str, Any]) -> str:
+    return hashlib.sha256(
+        json.dumps(data, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
 
 
 # ==================================================
-# FINANCIAL SUMMARY GENERATOR (BACKEND ONLY)
+# DERIVED METRICS (PURE MATH)
+# ==================================================
+def _derive_financial_metrics(metrics: Dict[str, Any]) -> Dict[str, Any]:
+    income = metrics.get("total_income", 0) or 0
+    expenses = metrics.get("total_expenses", 0) or 0
+    withdrawals = metrics.get("withdrawal_count", 0) or 0
+    deposits = metrics.get("deposit_count", 0) or 0
+
+    return {
+        "expense_to_income_ratio": (
+            round(expenses / income, 4) if income > 0 else None
+        ),
+        "avg_expense_per_transaction": (
+            round(expenses / withdrawals, 2) if withdrawals > 0 else None
+        ),
+        "avg_income_per_transaction": (
+            round(income / deposits, 2) if deposits > 0 else None
+        ),
+        "transaction_frequency_ratio": (
+            round(withdrawals / max(deposits, 1), 2)
+        ),
+        "net_cashflow": round(income - expenses, 2),
+    }
+
+
+# ==================================================
+# CLASSIFIERS (RULES ONLY)
+# ==================================================
+def _classify_cashflow_health(metrics: Dict[str, Any]) -> str:
+    income = metrics.get("total_income", 0) or 0
+    net = metrics.get("net_cashflow", 0) or 0
+
+    if income == 0:
+        return "Unknown"
+
+    ratio = abs(net) / income
+
+    if net < 0 and ratio > 0.05:
+        return "Low"
+    if ratio <= 0.05:
+        return "Moderate"
+    return "High"
+
+
+def _classify_patterns(
+    metrics: Dict[str, Any],
+    derived: Dict[str, Any],
+) -> List[str]:
+    flags: List[str] = []
+
+    if derived.get("expense_to_income_ratio") is not None:
+        if derived["expense_to_income_ratio"] > 1:
+            flags.append("expenses_exceed_income")
+
+    if derived.get("transaction_frequency_ratio", 0) > 5:
+        flags.append("high_spending_frequency")
+
+    if derived.get("avg_expense_per_transaction") is not None:
+        if derived["avg_expense_per_transaction"] < 250:
+            flags.append("micro_spending_pattern")
+
+    if metrics.get("withdrawal_count", 0) > 2000:
+        flags.append("very_high_transaction_volume")
+
+    return flags
+
+
+# ==================================================
+# INSIGHT REGISTRY
+# ==================================================
+INSIGHT_REGISTRY = {
+    "expenses_exceed_income": {
+        "severity": "warning",
+        "title": "Expenses exceed income",
+        "description": (
+            "Your total expenses are higher than your total income "
+            "for this period."
+        ),
+    },
+    "high_spending_frequency": {
+        "severity": "info",
+        "title": "High spending frequency",
+        "description": (
+            "You make a large number of transactions relative to "
+            "your income events."
+        ),
+    },
+    "micro_spending_pattern": {
+        "severity": "info",
+        "title": "Frequent small-value spending",
+        "description": (
+            "Your average spending per transaction is low, indicating "
+            "many small purchases."
+        ),
+    },
+    "very_high_transaction_volume": {
+        "severity": "info",
+        "title": "Very high transaction volume",
+        "description": (
+            "You have an unusually high number of transactions, which "
+            "can make tracking finances harder."
+        ),
+    },
+}
+
+
+# ==================================================
+# INSIGHT BUILDER (NO LLM)
+# ==================================================
+def _build_insights(metrics: Dict[str, Any]) -> Dict[str, Any]:
+    derived = _derive_financial_metrics(metrics)
+    flags = _classify_patterns(metrics, derived)
+
+    cashflow_health = _classify_cashflow_health({
+        **metrics,
+        **derived,
+    })
+
+    insights = [
+        INSIGHT_REGISTRY[flag]
+        for flag in flags
+        if flag in INSIGHT_REGISTRY
+    ]
+
+    return {
+        "derived_metrics": derived,
+        "cashflow_health": cashflow_health,
+        "insights": insights,
+    }
+
+
+# ==================================================
+# PUBLIC API
 # ==================================================
 def generate_financial_summary(
     metrics: Dict[str, Any],
     *,
-    force_refresh: bool = False
+    account_id: str | None = None,
+    force_refresh: bool = False,
 ) -> Dict[str, Any]:
     """
-    Generates a qualitative financial summary.
+    Generates a deep, safe financial summary.
 
-    Behavior:
-    - force_refresh=True  → bypass cache, regenerate insight
-    - force_refresh=False → use cache if fingerprint unchanged
-
-    Guarantees:
-    - Metrics are authoritative
-    - No numeric inference by LLM
-    - Deterministic & auditable
+    - All calculations are backend-only
+    - LLM is used for wording only
+    - Deterministic, cacheable, auditable
     """
 
+    if not isinstance(metrics, dict) or not metrics:
+        raise ValueError("metrics must be a non-empty dict")
+
+    insights_payload = _build_insights(metrics)
+
+    payload = {
+        "metrics": make_json_safe(metrics),
+        "insights": insights_payload,
+    }
+
+    fingerprint = _fingerprint(payload)
+    cache_key = account_id or fingerprint[:12]
+    cache_path = _cache_file(cache_key)
+
     # -------------------------------
-    # Hard guards
+    # Cache hit
+    # -------------------------------
+    if cache_path.exists() and not force_refresh:
+        cached = json.loads(cache_path.read_text())
+        if cached.get("fingerprint") == fingerprint:
+            return {
+                "type": "llm_financial_summary",
+                "model": cached.get("model"),
+                "content": cached.get("content"),
+                "cached": True,
+                "insights": insights_payload,
+            }
+
+    # -------------------------------
+    # LLM disabled
     # -------------------------------
     if not LLM_ENABLED:
         return {
             "type": "llm_financial_summary",
             "model": None,
-            "content": "LLM disabled by server configuration.",
+            "content": "LLM disabled. Metrics and insights are authoritative.",
             "cached": False,
+            "insights": insights_payload,
         }
 
-    if not isinstance(metrics, dict):
-        raise ValueError("metrics must be a dict")
-
-    if not metrics:
-        return {
-            "type": "llm_financial_summary",
-            "model": None,
-            "content": "No financial metrics available.",
-            "cached": False,
-        }
-
-    # -------------------------------
-    # Fingerprint + cache lookup
-    # -------------------------------
-    safe_metrics = make_json_safe(metrics)
-    fingerprint = _fingerprint_metrics(safe_metrics)
-
-    cache = _load_cache()
-    if (
-        not force_refresh
-        and cache
-        and cache.get("fingerprint") == fingerprint
-    ):
-        return {
-            "type": "llm_financial_summary",
-            "model": cache.get("model"),
-            "content": cache.get("content"),
-            "cached": True,
-        }
-
-    # -------------------------------
-    # Prompt
-    # -------------------------------
     prompt = f"""
 {SYSTEM_PROMPT}
 
-AUTHORITATIVE_METRICS:
-{json.dumps(safe_metrics, indent=2)}
+DATA:
+{json.dumps(payload, indent=2)}
 
-Provide:
-1. Income, expense, net cashflow summary
-2. Cashflow health (Low / Moderate / High)
+Respond EXACTLY in this format:
 
-Do NOT invent numbers.
-If unsure, restate the provided totals.
+SUMMARY:
+<one short paragraph>
+
+CASHFLOW_HEALTH:
+<verbatim value>
 """
 
     # -------------------------------
     # LLM Call
     # -------------------------------
     try:
-        content = call_llm(
-            prompt,
-            temperature=0.05
-        )
+        content = call_llm(prompt, temperature=0.05)
 
-        payload = {
+        cache_path.write_text(json.dumps({
             "fingerprint": fingerprint,
-            "metrics": safe_metrics,
             "model": LLM_MODEL,
             "content": content,
-        }
-
-        _save_cache(payload)
+        }, indent=2))
 
         return {
             "type": "llm_financial_summary",
             "model": LLM_MODEL,
             "content": content,
             "cached": False,
+            "insights": insights_payload,
         }
 
     except Exception:
@@ -175,8 +279,10 @@ If unsure, restate the provided totals.
             "type": "llm_financial_summary",
             "model": None,
             "content": (
-                "Financial summary unavailable.\n"
-                "Authoritative metrics remain valid."
+                "Summary unavailable. "
+                "All financial metrics and insights remain authoritative."
             ),
             "cached": False,
+            "degraded": True,
+            "insights": insights_payload,
         }
