@@ -44,11 +44,12 @@ Your task:
 - If the merchant appears to be a PERSON or a personal UPI payment,
   prefer the category "Transfer" with LOW confidence.
 - DO NOT guess aggressively for unknown merchants.
+- DO NOT guess the category aggresively 
 
 Confidence rules (VERY IMPORTANT):
-- 0.90–1.00 → Very confident, well-known brand or obvious category
-- 0.75–0.89 → Reasonably confident, common merchant
-- 0.60–0.74 → Weak signal, some ambiguity
+- 0.90-1.00 → Very confident, well-known brand or obvious category
+- 0.75-0.89 → Reasonably confident, common merchant
+- 0.60-0.74 → Weak signal, some ambiguity
 - <0.60     → Highly uncertain
 
 Guidelines:

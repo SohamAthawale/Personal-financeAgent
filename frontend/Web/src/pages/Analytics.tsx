@@ -1,32 +1,57 @@
 import { useState, useEffect } from 'react';
-import { Loader, AlertCircle } from 'lucide-react';
+import { Loader, AlertCircle, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
+
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { AnalyticsData } from '../types';
 
 /* =======================
-   Types LOCAL to page
-   ======================= */
+   Types
+======================= */
 
 type FilterType = 'month' | 'period';
 
 type AnalyticsApiResponse = {
-  status: 'success' | 'error';
+  status: 'success' | 'error' | 'no_data';
   message?: string;
   metrics?: {
     total_income: number;
     total_expense: number;
     net_cashflow: number;
   };
-  categories?: Array<{
+  categories?: {
     category: string;
-    expense: number;
-  }>;
+    expense?: number;
+    total_expense?: number;
+  }[];
+  trends?: {
+    monthly?: {
+      month: string;
+      income: number;
+      expense: number;
+      savings: number;
+    }[];
+    yearly?: {
+      year: string;
+      income: number;
+      expense: number;
+      savings: number;
+    }[];
+  };
 };
 
 /* =======================
    Component
-   ======================= */
+======================= */
 
 export function Analytics() {
   const { auth } = useAuth();
@@ -43,7 +68,7 @@ export function Analytics() {
 
   /* =======================
      Load analytics
-     ======================= */
+  ======================= */
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -52,11 +77,6 @@ export function Analytics() {
   }, [auth, filterType, selectedMonth, selectedPeriod]);
 
   const loadAnalytics = async () => {
-    if (!auth?.token) {
-      setError('You must be logged in to view analytics');
-      return;
-    }
-
     try {
       setLoading(true);
       setError('');
@@ -67,12 +87,12 @@ export function Analytics() {
           : { period: selectedPeriod };
 
       const result = (await api.getAnalytics(
-        auth.token,
+        auth!.token,
         params
       )) as AnalyticsApiResponse;
 
       if (result.status !== 'success') {
-        setError(result.message ?? 'Failed to load analytics');
+        setError(result.message ?? 'No analytics data');
         setData(null);
         return;
       }
@@ -87,65 +107,58 @@ export function Analytics() {
   };
 
   /* =======================
-     Adapter: API → UI
-     ======================= */
+     Trend helpers (UI only)
+  ======================= */
 
-  const analytics: AnalyticsData['data'] | null =
-    data?.status === 'success' && data.metrics && data.categories
-      ? {
-          period:
-            filterType === 'month' ? selectedMonth : selectedPeriod,
-          total_income: data.metrics.total_income,
-          total_expenses: data.metrics.total_expense,
-          balance: data.metrics.net_cashflow,
-          categories: Object.fromEntries(
-            data.categories.map((c) => [c.category, c.expense])
-          ),
-          transactions: [],
-        }
-      : null;
+  const monthly = data?.trends?.monthly ?? [];
+  const yearly = data?.trends?.yearly ?? [];
+
+  const lastMonth =
+    monthly.length > 0 ? monthly[monthly.length - 1] : undefined;
+
+  const prevMonth =
+    monthly.length > 1 ? monthly[monthly.length - 2] : undefined;
+
+  const incomeTrend =
+    lastMonth && prevMonth
+      ? lastMonth.income - prevMonth.income
+      : 0;
+
+  const expenseTrend =
+    lastMonth && prevMonth
+      ? lastMonth.expense - prevMonth.expense
+      : 0;
 
   /* =======================
-     Render guards
-     ======================= */
+     Guards
+  ======================= */
 
   if (!auth) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-slate-500">
-          Please log in to view analytics.
-        </p>
+        <p className="text-slate-500">Please log in to view analytics.</p>
       </div>
     );
   }
 
   /* =======================
      Render
-     ======================= */
+  ======================= */
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Analytics
-          </h1>
-          <p className="text-gray-600">
-            View your spending patterns and financial overview
-          </p>
-        </div>
+        <h1 className="text-4xl font-bold mb-6">Analytics</h1>
 
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Filter Data
-          </h3>
+        {/* =======================
+            FILTERS (RESTORED)
+        ======================= */}
+        <div className="bg-white p-6 rounded shadow mb-8">
+          <h3 className="font-semibold mb-4">Filter Data</h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Filter Type
-              </label>
+              <label className="block text-sm mb-2">Filter Type</label>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2">
                   <input
@@ -155,6 +168,7 @@ export function Analytics() {
                   />
                   Period
                 </label>
+
                 <label className="flex items-center gap-2">
                   <input
                     type="radio"
@@ -170,7 +184,7 @@ export function Analytics() {
               <select
                 value={selectedPeriod}
                 onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="px-4 py-2 border rounded-lg"
+                className="border px-3 py-2 rounded"
               >
                 <option value="3m">Last 3 Months</option>
                 <option value="6m">Last 6 Months</option>
@@ -181,7 +195,7 @@ export function Analytics() {
                 type="month"
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="px-4 py-2 border rounded-lg"
+                className="border px-3 py-2 rounded"
               />
             )}
           </div>
@@ -189,48 +203,67 @@ export function Analytics() {
 
         {/* Errors */}
         {error && (
-          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
-            <AlertCircle className="w-5 h-5 text-red-600" />
-            <p className="text-red-700">{error}</p>
+          <div className="bg-red-50 border border-red-200 p-4 rounded mb-6 flex gap-2">
+            <AlertCircle className="text-red-600" />
+            {error}
           </div>
         )}
 
         {/* Loading */}
         {loading && (
           <div className="flex justify-center py-12">
-            <Loader className="w-8 h-8 animate-spin text-blue-600" />
+            <Loader className="animate-spin text-blue-600" />
           </div>
         )}
 
-        {/* Analytics */}
-        {!loading && analytics && (
-          <>
-            <div className="grid md:grid-cols-3 gap-6 mb-6">
-              <Stat label="Total Income" value={analytics.total_income} color="green" />
-              <Stat label="Total Expenses" value={analytics.total_expenses} color="red" />
-              <Stat label="Net Balance" value={analytics.balance} color="blue" />
-            </div>
-
-            {Object.keys(analytics.categories).length > 0 && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="font-semibold mb-4">
-                  Spending by Category
-                </h3>
-                {Object.entries(analytics.categories).map(([k, v]) => (
-                  <div key={k} className="flex justify-between mb-2">
-                    <span>{k}</span>
-                    <span>₹{v.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
+        {/* Summary Cards */}
+        {!loading && data?.metrics && (
+          <div className="grid md:grid-cols-3 gap-6 mb-10">
+            <Stat
+              label="Total Income"
+              value={data.metrics.total_income}
+              color="green"
+              trend={incomeTrend}
+            />
+            <Stat
+              label="Total Expenses"
+              value={data.metrics.total_expense}
+              color="red"
+              trend={expenseTrend}
+              invertTrend
+            />
+            <Stat
+              label="Net Balance"
+              value={data.metrics.net_cashflow}
+              color="blue"
+            />
+          </div>
         )}
 
-        {!loading && !analytics && !error && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-            No analytics data available.
-          </div>
+        {/* Month-to-Month Graph */}
+        {monthly.length > 0 && (
+          <ChartCard title="Month-to-Month Comparison">
+            <LineChart data={monthly}>
+              <XAxis dataKey="month" />
+              <YAxis />
+              <Tooltip />
+              <Line dataKey="income" stroke="#16a34a" />
+              <Line dataKey="expense" stroke="#dc2626" />
+            </LineChart>
+          </ChartCard>
+        )}
+
+        {/* Yearly Graph */}
+        {yearly.length > 0 && (
+          <ChartCard title="Yearly Comparison">
+            <BarChart data={yearly}>
+              <XAxis dataKey="year" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="income" fill="#22c55e" />
+              <Bar dataKey="expense" fill="#ef4444" />
+            </BarChart>
+          </ChartCard>
         )}
       </div>
     </div>
@@ -238,30 +271,64 @@ export function Analytics() {
 }
 
 /* =======================
-   Small helper component
-   ======================= */
+   UI Helpers
+======================= */
+
+function ChartCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white p-6 rounded shadow mb-10">
+      <h3 className="font-semibold mb-4">{title}</h3>
+      <ResponsiveContainer width="100%" height={320}>
+        {children}
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 function Stat({
   label,
   value,
   color,
+  trend,
+  invertTrend = false,
 }: {
   label: string;
   value: number;
   color: 'green' | 'red' | 'blue';
+  trend?: number;
+  invertTrend?: boolean;
 }) {
-  const colors: Record<typeof color, string> = {
+  const colors = {
     green: 'text-green-600',
     red: 'text-red-600',
     blue: 'text-blue-600',
   };
 
+  const isUp = invertTrend ? trend! < 0 : trend! > 0;
+
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-white p-6 rounded shadow">
       <p className="text-sm text-gray-600 mb-1">{label}</p>
-      <p className={`text-3xl font-bold ${colors[color]}`}>
-        ₹{value.toLocaleString()}
-      </p>
+
+      <div className="flex items-center gap-2">
+        <p className={`text-3xl font-bold ${colors[color]}`}>
+          ₹{value.toLocaleString()}
+        </p>
+
+        {trend !== undefined && trend !== 0 && (
+          isUp ? (
+            <ArrowUp className="text-green-500" size={20} />
+          ) : (
+            <ArrowDown className="text-red-500" size={20} />
+          )
+        )}
+      </div>
     </div>
   );
 }

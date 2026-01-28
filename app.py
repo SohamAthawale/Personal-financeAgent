@@ -175,17 +175,43 @@ def parse_statement_route():
 # ==================================================
 # ANALYTICS
 # ==================================================
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+
+from flask import request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
+
+from db import SessionLocal
+from models import User
+
+
 @app.route("/api/statement/analytics", methods=["GET"])
 @jwt_required()
 def analytics_route():
+    """
+    Analytics endpoint.
+
+    Responsibilities:
+    - Parse query params
+    - Resolve date window
+    - Read JWT identity
+    - Fetch user from DB
+    - Delegate analytics computation
+    """
+
     month = request.args.get("month")
     period = request.args.get("period")
 
-    start_date = end_date = None
+    start_date = None
+    end_date = None
 
+    # --------------------------------------------------
+    # Resolve date window
+    # --------------------------------------------------
     if month:
         start_date = datetime.strptime(month, "%Y-%m")
         end_date = start_date + relativedelta(months=1)
+
     elif period:
         months = int(period.replace("m", ""))
         end_date = datetime.utcnow()
@@ -193,19 +219,32 @@ def analytics_route():
 
     db = SessionLocal()
     try:
-        user = get_current_user(db)
-        if not user:
-            return {"message": "user not found"}, 404
+        # --------------------------------------------------
+        # Auth (JWT → DB user)
+        # --------------------------------------------------
+        user_id = get_jwt_identity()
+        if not user_id:
+            return jsonify({"message": "invalid token"}), 401
 
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return jsonify({"message": "user not found"}), 404
+
+        # --------------------------------------------------
+        # Analytics (single source of truth)
+        # --------------------------------------------------
         result = compute_analytics(
             db=db,
             user_id=user.id,
             start_date=start_date,
             end_date=end_date,
         )
+
         return jsonify(result)
+
     finally:
         db.close()
+
 
 # ==================================================
 # INSIGHTS

@@ -329,6 +329,89 @@ def compute_analytics(
     metrics["top_upi_counterparties"] = (
         upi_summary.to_dict(orient="records")
     )
+ # --------------------------------------------------
+    # 7️⃣.5 Trend analytics (COMPARATIVE)
+    # --------------------------------------------------
+
+    # Monthly timeseries (already computed)
+    monthly_df = pd.DataFrame(metrics["monthly_timeseries"])
+
+    # ---- Month-over-Month ----
+    month_over_month = []
+    if len(monthly_df) >= 2:
+        df_mom = monthly_df.copy()
+
+        df_mom["income_prev"] = df_mom["income"].shift(1)
+        df_mom["expense_prev"] = df_mom["expense"].shift(1)
+
+        df_mom["income_change"] = df_mom["income"] - df_mom["income_prev"]
+        df_mom["expense_change"] = df_mom["expense"] - df_mom["expense_prev"]
+
+        df_mom["income_pct_change"] = (
+            df_mom["income_change"] / df_mom["income_prev"]
+        )
+
+        df_mom["expense_pct_change"] = (
+            df_mom["expense_change"] / df_mom["expense_prev"]
+        )
+
+        # 🔐 HARD JSON SAFETY (MANDATORY)
+        df_mom = (
+            df_mom
+            .replace([float("inf"), -float("inf")], 0)
+            .fillna(0)
+            .round(4)
+        )
+
+        month_over_month = df_mom.to_dict(orient="records")
+
+    # ---- Yearly aggregation ----
+    df_txn["year"] = df_txn["date"].dt.year.astype(str)
+
+    yearly_df = (
+        df_txn
+        .groupby("year", as_index=False)
+        .agg(
+            income=("deposit", "sum"),
+            expense=("withdrawal", "sum"),
+        )
+    )
+
+    yearly_df["savings"] = yearly_df["income"] - yearly_df["expense"]
+
+    # 🔐 Safety
+    yearly_df = (
+        yearly_df
+        .replace([float("inf"), -float("inf")], 0)
+        .fillna(0)
+        .round(2)
+    )
+
+    # ---- Year-over-Year ----
+    year_over_year = []
+    if len(yearly_df) >= 2:
+        df_yoy = yearly_df.copy()
+
+        df_yoy["income_prev"] = df_yoy["income"].shift(1)
+        df_yoy["expense_prev"] = df_yoy["expense"].shift(1)
+
+        df_yoy["income_growth_pct"] = (
+            (df_yoy["income"] - df_yoy["income_prev"]) / df_yoy["income_prev"]
+        )
+
+        df_yoy["expense_growth_pct"] = (
+            (df_yoy["expense"] - df_yoy["expense_prev"]) / df_yoy["expense_prev"]
+        )
+
+        # 🔐 HARD JSON SAFETY
+        df_yoy = (
+            df_yoy
+            .replace([float("inf"), -float("inf")], 0)
+            .fillna(0)
+            .round(4)
+        )
+
+        year_over_year = df_yoy.to_dict(orient="records")
 
     # --------------------------------------------------
     # 8️⃣ Audit metadata (DEBUG + TRUST)
@@ -365,7 +448,14 @@ def compute_analytics(
         "metrics": metrics,
         "categories": category_spending.to_dict(orient="records"),
         "debits": all_debits.to_dict(orient="records"),
+        "trends": {
+            "monthly": metrics["monthly_timeseries"],
+            "month_over_month": month_over_month,
+            "yearly": yearly_df.to_dict(orient="records"),
+            "year_over_year": year_over_year,
+        },
     }
+
 
 # ==================================================
 # 3️⃣ INSIGHTS (LLM)
