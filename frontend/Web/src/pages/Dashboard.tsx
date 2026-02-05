@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import type { ParseResponse } from '../types';
 
 /* =======================
    Types
@@ -55,6 +56,7 @@ export function Dashboard() {
   const [dragActive, setDragActive] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loadingTx, setLoadingTx] = useState(false);
+  const [lastParse, setLastParse] = useState<ParseResponse | null>(null);
 
   const [explainTx, setExplainTx] = useState<ExplainResponse | null>(null);
   const [editTx, setEditTx] = useState<Transaction | null>(null);
@@ -116,6 +118,7 @@ export function Dashboard() {
             progress: Math.min(30, Math.round(progress)),
           }))
       );
+      setLastParse(result);
 
       setUploadStatus({
         status: 'uploading',
@@ -136,10 +139,14 @@ export function Dashboard() {
       await new Promise((r) => setTimeout(r, 600));
 
       if (result.status === 'success') {
+        const count =
+          result.transaction_count ??
+          result.transactions_count ??
+          0;
         setUploadStatus({
           status: 'success',
           progress: 100,
-          message: `Parsed ${result.transactions_count || 0} transactions`,
+          message: `Parsed ${count} transactions`,
         });
         await fetchTransactions();
         setTimeout(
@@ -225,6 +232,11 @@ export function Dashboard() {
     setEditTx(null);
   };
 
+  const formatPercent = (value?: number) => {
+    if (typeof value !== 'number') return 'n/a';
+    return `${(value * 100).toFixed(0)}%`;
+  };
+
   /* =======================
      Render
      ======================= */
@@ -280,6 +292,86 @@ export function Dashboard() {
           <AlertCircle className="mx-auto text-red-500 mt-4" />
         )}
       </div>
+
+      {lastParse?.status === 'success' && (
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="font-semibold mb-4">Latest Parse Trace</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-700">
+            <div>
+              <div className="text-xs text-gray-500">Statement ID</div>
+              <div className="font-medium">{lastParse.statement_id ?? 'n/a'}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Transactions</div>
+              <div className="font-medium">
+                {lastParse.transaction_count ??
+                  lastParse.transactions_count ??
+                  'n/a'}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Schema Confidence</div>
+              <div className="font-medium">
+                {formatPercent(lastParse.schema_confidence)}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Variant</div>
+              <div className="font-medium">{lastParse.schema_variant ?? 'n/a'}</div>
+            </div>
+          </div>
+
+          {lastParse.trace && (
+            <div className="mt-4 text-xs text-gray-700 space-y-2">
+              <div>
+                <span className="text-gray-500">Initial:</span>{' '}
+                {formatPercent(lastParse.trace.initial?.confidence)}{' '}
+                {lastParse.trace.initial?.schema_type
+                  ? `(${lastParse.trace.initial?.schema_type})`
+                  : ''}
+              </div>
+
+              {lastParse.trace.retry && (
+                <div>
+                  <span className="text-gray-500">Retry:</span>{' '}
+                  {lastParse.trace.retry.decision ?? 'n/a'}
+                </div>
+              )}
+
+              {lastParse.trace.retry?.candidates &&
+                lastParse.trace.retry.candidates.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {lastParse.trace.retry.candidates.map((c, idx) => (
+                      <span
+                        key={`${c.variant}-${idx}`}
+                        className="bg-gray-100 text-gray-700 px-2 py-1 rounded"
+                      >
+                        {c.variant ?? 'variant'} · {formatPercent(c.confidence)}
+                        {c.schema_type ? ` · ${c.schema_type}` : ''}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+              {lastParse.trace.arbitration?.used && (
+                <div>
+                  <span className="text-gray-500">Arbitration:</span>{' '}
+                  {lastParse.trace.arbitration.status ?? 'used'}
+                  {lastParse.trace.arbitration.winner_variant
+                    ? ` · ${lastParse.trace.arbitration.winner_variant}`
+                    : ''}
+                  {typeof lastParse.trace.arbitration.winner_confidence === 'number'
+                    ? ` · ${formatPercent(
+                        lastParse.trace.arbitration.winner_confidence
+                      )}`
+                    : ''}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Transactions */}
       <div className="bg-white rounded-xl shadow p-6">

@@ -93,15 +93,86 @@ def parse_statement(
 
     schema, confidence = choose_best_hypothesis(rows)
 
+    schema_type = schema.get("type") if isinstance(schema, dict) else None
+    trace = {
+        "initial": {
+            "confidence": confidence,
+            "schema_type": schema_type,
+        },
+        "retry": {"decision": "skipped"},
+        "arbitration": {"used": False},
+    }
+
     if confidence < 0.9:
-        final = retry_with_variants(rows, choose_best_hypothesis)
-        if final.get("decision") == "needs_arbitration":
-            final = llm_arbitrate([final]) or final
+        retry_result = retry_with_variants(rows, choose_best_hypothesis)
+
+        candidates = retry_result.get("candidates", [])
+        trace["retry"] = {
+            "decision": retry_result.get("decision"),
+            "candidates": [
+                {
+                    "variant": c.get("variant"),
+                    "confidence": c.get("confidence"),
+                    "schema_type": (
+                        c.get("schema", {}).get("type")
+                        if isinstance(c.get("schema"), dict)
+                        else None
+                    ),
+                }
+                for c in candidates
+            ],
+        }
+
+        if retry_result.get("decision") == "needs_arbitration":
+            winner = llm_arbitrate(candidates)
+
+            if winner:
+                final = winner
+                trace["arbitration"] = {
+                    "used": True,
+                    "status": "selected",
+                    "winner_variant": winner.get("variant"),
+                    "winner_confidence": winner.get("confidence"),
+                }
+            else:
+                # Fallback to best-confidence candidate if arbitration fails
+                if candidates:
+                    best = max(candidates, key=lambda c: c.get("confidence", 0))
+                    final = {
+                        "schema": best.get("schema"),
+                        "confidence": best.get("confidence"),
+                        "variant": best.get("variant"),
+                    }
+                    trace["arbitration"] = {
+                        "used": True,
+                        "status": "fallback_best",
+                        "winner_variant": best.get("variant"),
+                        "winner_confidence": best.get("confidence"),
+                    }
+                else:
+                    final = retry_result
+        else:
+            final = retry_result
     else:
-        final = {"schema": schema, "confidence": confidence}
+        final = {
+            "schema": schema,
+            "confidence": confidence,
+            "variant": "original",
+        }
 
     if not final.get("schema"):
         return {"status": "error", "message": "Schema detection failed"}
+
+    final_schema_type = (
+        final.get("schema", {}).get("type")
+        if isinstance(final.get("schema"), dict)
+        else None
+    )
+    trace["final"] = {
+        "confidence": final.get("confidence"),
+        "variant": final.get("variant", "original"),
+        "schema_type": final_schema_type,
+    }
 
     # Create statement row
     statement = Statement(
@@ -140,7 +211,10 @@ def parse_statement(
         "status": "success",
         "statement_id": statement.id,
         "transaction_count": len(transactions),
+        "transactions_count": len(transactions),
         "schema_confidence": final["confidence"],
+        "schema_variant": final.get("variant", "original"),
+        "trace": trace,
     }
 
 
@@ -463,12 +537,64 @@ def compute_analytics(
 from typing import Dict, Any
 from sqlalchemy.orm import Session
 
-from models import Transaction, Statement
+from models import Transaction, Statement, InsightSnapshot
 from pipeline.core import compute_analytics
 
 from agent.insights.financial_summary import generate_financial_summary
 from agent.insights.transaction_patterns import generate_transaction_patterns
 from agent.insights.category_insights import generate_category_insights
+from datetime import datetime
+
+
+def _month_start(dt: datetime | None = None):
+    dt = dt or datetime.utcnow()
+    return datetime(dt.year, dt.month, 1).date()
+
+
+def _upsert_insight_snapshot(
+    *,
+    db: Session,
+    user_id: int,
+    financial_summary,
+    category_insights,
+    transaction_patterns,
+    metrics,
+):
+    month = _month_start()
+    safe_financial_summary = make_json_safe(financial_summary)
+    safe_category_insights = make_json_safe(category_insights)
+    safe_transaction_patterns = make_json_safe(transaction_patterns)
+    safe_metrics = make_json_safe(metrics)
+
+    existing = (
+        db.query(InsightSnapshot)
+        .filter(
+            InsightSnapshot.user_id == user_id,
+            InsightSnapshot.snapshot_month == month,
+        )
+        .first()
+    )
+
+    if existing:
+        existing.financial_summary = safe_financial_summary
+        existing.category_insights = safe_category_insights
+        existing.transaction_patterns = safe_transaction_patterns
+        existing.metrics = safe_metrics
+        existing.created_at = datetime.utcnow()
+        snapshot = existing
+    else:
+        snapshot = InsightSnapshot(
+            user_id=user_id,
+            snapshot_month=month,
+            financial_summary=safe_financial_summary,
+            category_insights=safe_category_insights,
+            transaction_patterns=safe_transaction_patterns,
+            metrics=safe_metrics,
+        )
+        db.add(snapshot)
+
+    db.commit()
+    return snapshot
 
 
 def generate_insights_view(
@@ -549,26 +675,46 @@ def generate_insights_view(
     # --------------------------------------------------
     # 4️⃣ LLM = explanation layer ONLY
     # --------------------------------------------------
+    financial_summary = generate_financial_summary(
+        metrics,
+        force_refresh=force_refresh
+    )
+
+    category_insights = generate_category_insights(
+        categories,
+        force_refresh=force_refresh
+    )
+
+    transaction_patterns = generate_transaction_patterns(
+        transaction_patterns_input,
+        force_refresh=force_refresh
+    )
+
+    snapshot = _upsert_insight_snapshot(
+        db=db,
+        user_id=user_id,
+        financial_summary=financial_summary,
+        category_insights=category_insights,
+        transaction_patterns=transaction_patterns,
+        metrics=metrics,
+    )
+
     return {
         "status": "success",
 
         # 🔒 Uses authoritative metrics only
-        "financial_summary": generate_financial_summary(
-            metrics,
-            force_refresh=force_refresh
-        ),
+        "financial_summary": financial_summary,
 
         # 🔒 Uses authoritative category totals
-        "category_insights": generate_category_insights(
-            categories,
-            force_refresh=force_refresh
-        ),
+        "category_insights": category_insights,
 
         # 🔒 Pattern-only, no math
-        "transaction_patterns": generate_transaction_patterns(
-            transaction_patterns_input,
-            force_refresh=force_refresh
-        ),
+        "transaction_patterns": transaction_patterns,
+
+        "snapshot": {
+            "month": snapshot.snapshot_month.isoformat(),
+            "created_at": snapshot.created_at.isoformat(),
+        },
     }
 
 # ==================================================

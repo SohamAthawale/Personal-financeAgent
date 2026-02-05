@@ -64,10 +64,43 @@ export interface RecommendationsResponse {
   message?: string;
 }
 
+export interface ParseTraceCandidate {
+  variant?: string;
+  confidence?: number;
+  schema_type?: string | null;
+}
+
+export interface ParseTrace {
+  initial?: {
+    confidence?: number;
+    schema_type?: string | null;
+  };
+  retry?: {
+    decision?: string;
+    candidates?: ParseTraceCandidate[];
+  };
+  arbitration?: {
+    used?: boolean;
+    status?: string;
+    winner_variant?: string;
+    winner_confidence?: number;
+  };
+  final?: {
+    confidence?: number;
+    variant?: string;
+    schema_type?: string | null;
+  };
+}
+
 export interface ParseResponse {
   status: string;
   message?: string;
   transactions_count?: number;
+  transaction_count?: number;
+  statement_id?: number;
+  schema_confidence?: number;
+  schema_variant?: string;
+  trace?: ParseTrace;
 }
 // ===== Raw backend analytics response =====
 
@@ -118,6 +151,38 @@ export interface InsightsApiResponse {
     type: string;
   };
 
+  snapshot?: {
+    month: string;
+    created_at: string;
+  };
+
+  message?: string;
+}
+
+export interface InsightSnapshot {
+  month: string;
+  created_at: string;
+  financial_summary?: {
+    content: string;
+    model: string;
+    type: string;
+  };
+  category_insights?: {
+    content: string;
+    model: string;
+    type: string;
+  };
+  transaction_patterns?: {
+    content: string;
+    model: string;
+    type: string;
+  };
+  metrics?: Record<string, unknown>;
+}
+
+export interface InsightsHistoryResponse {
+  status: 'success' | 'error';
+  snapshots?: InsightSnapshot[];
   message?: string;
 }
 // ===== Goal engine & analytics =====
@@ -177,5 +242,3 @@ export interface RecommendationsApiResponse {
 
   message?: string;
 }
-
-

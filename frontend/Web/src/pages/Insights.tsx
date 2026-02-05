@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Loader, AlertCircle, RefreshCw, Lightbulb } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import type { InsightSnapshot } from '../types';
 
 /* =======================
    Local API response type
@@ -28,6 +29,11 @@ type InsightsApiResponse = {
     model: string;
     type: string;
   };
+
+  snapshot?: {
+    month: string;
+    created_at: string;
+  };
 };
 
 export function Insights() {
@@ -36,6 +42,9 @@ export function Insights() {
   const [data, setData] = useState<InsightsApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [history, setHistory] = useState<InsightSnapshot[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState('');
 
   /* =======================
      Load insights
@@ -72,6 +81,32 @@ export function Insights() {
     }
   };
 
+  const loadHistory = async () => {
+    if (!auth) {
+      setHistoryLoading(false);
+      return;
+    }
+
+    try {
+      setHistoryLoading(true);
+      setHistoryError('');
+      const result = await api.getInsightsHistory(auth.token, 12);
+      if (result.status !== 'success') {
+        setHistoryError(result.message ?? 'Failed to load history');
+        setHistory([]);
+        return;
+      }
+      setHistory(result.snapshots ?? []);
+    } catch (err) {
+      setHistoryError(
+        err instanceof Error ? err.message : 'Failed to load history'
+      );
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   /* =======================
      Initial load (soft)
      ======================= */
@@ -79,8 +114,10 @@ export function Insights() {
   useEffect(() => {
     if (auth) {
       loadInsights(false);
+      loadHistory();
     } else {
       setLoading(false);
+      setHistoryLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth]);
@@ -109,6 +146,15 @@ export function Insights() {
           },
         ].filter((i) => Boolean(i.content))
       : [];
+
+  const formatMonth = (value: string) => {
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return value;
+    return dt.toLocaleString('en-US', {
+      month: 'long',
+      year: 'numeric',
+    });
+  };
 
   /* =======================
      Render
@@ -195,6 +241,78 @@ export function Insights() {
             </p>
           </div>
         )}
+
+        <div className="mt-12">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+            Insights History
+          </h2>
+
+          {historyError && (
+            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              <p className="text-red-700">{historyError}</p>
+            </div>
+          )}
+
+          {historyLoading && (
+            <div className="flex items-center justify-center py-6">
+              <Loader className="w-6 h-6 text-blue-600 animate-spin" />
+            </div>
+          )}
+
+          {!historyLoading && history.length === 0 && !historyError && (
+            <div className="bg-white rounded-lg shadow-sm p-6 text-gray-600">
+              No historical snapshots yet.
+            </div>
+          )}
+
+          {!historyLoading && history.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {history.map((snapshot) => (
+                <div
+                  key={snapshot.month}
+                  className="bg-white rounded-lg shadow-md p-6"
+                >
+                  <div className="text-sm text-gray-500 mb-3">
+                    {formatMonth(snapshot.month)}
+                  </div>
+                  <div className="space-y-4">
+                    {snapshot.financial_summary?.content && (
+                      <div>
+                        <div className="text-xs uppercase text-gray-500 mb-1">
+                          Financial Summary
+                        </div>
+                        <p className="text-gray-700 whitespace-pre-line">
+                          {snapshot.financial_summary.content}
+                        </p>
+                      </div>
+                    )}
+                    {snapshot.category_insights?.content && (
+                      <div>
+                        <div className="text-xs uppercase text-gray-500 mb-1">
+                          Category Insights
+                        </div>
+                        <p className="text-gray-700 whitespace-pre-line">
+                          {snapshot.category_insights.content}
+                        </p>
+                      </div>
+                    )}
+                    {snapshot.transaction_patterns?.content && (
+                      <div>
+                        <div className="text-xs uppercase text-gray-500 mb-1">
+                          Transaction Patterns
+                        </div>
+                        <p className="text-gray-700 whitespace-pre-line">
+                          {snapshot.transaction_patterns.content}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

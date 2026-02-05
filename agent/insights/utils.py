@@ -1,29 +1,10 @@
 # agent/insights/utils.py
 
-import json
-import numpy as np
-import requests
-import time
 from typing import Any
-from threading import Lock
 
-# ==================================================
-# BACKEND CONFIG (SINGLE SOURCE OF TRUTH)
-# ==================================================
-try:
-    from config.llm import LLM_ENABLED, OLLAMA_URL, LLM_MODEL
-except ImportError:
-    # Safe defaults (local dev)
-    LLM_ENABLED = True
-    OLLAMA_URL = "http://localhost:11434/api/generate"
-    LLM_MODEL = "llama3"
+import numpy as np
 
-# ==================================================
-# INTERNAL STATE
-# ==================================================
-_LLM_LOCK = Lock()
-_LAST_FAILURE_TS = 0.0
-_FAILURE_COOLDOWN = 30  # seconds
+from llm.adapter import generate_text
 
 
 # ==================================================
@@ -78,59 +59,11 @@ def call_llm(
     - Single-flight protection (per process)
     - Controlled retries
     - Circuit breaker on repeated failure
-    - Deterministic-friendly
     """
+    response = generate_text(
+        prompt=prompt,
+        temperature=temperature,
+        max_retries=max_retries,
+    )
 
-    global _LAST_FAILURE_TS
-
-    # -------------------------------
-    # Hard guards
-    # -------------------------------
-    if not LLM_ENABLED:
-        return "LLM disabled by server configuration."
-
-    now = time.time()
-    if now - _LAST_FAILURE_TS < _FAILURE_COOLDOWN:
-        return "⚠️ LLM temporarily unavailable. Using cached insights."
-
-    # Prevent pathological prompts
-    if len(prompt) > 12_000:
-        prompt = prompt[:12_000] + "\n\n[TRUNCATED FOR SAFETY]"
-
-    # -------------------------------
-    # Single-flight lock
-    # -------------------------------
-    with _LLM_LOCK:
-        for attempt in range(1, max_retries + 1):
-            try:
-                response = requests.post(
-                    OLLAMA_URL,
-                    json={
-                        "model": LLM_MODEL,
-                        "prompt": prompt,
-                        "stream": False,
-                        "options": {
-                            "temperature": float(temperature),
-                            "top_p": 0.9,
-                        },
-                    },
-                    timeout=60,
-                )
-
-                response.raise_for_status()
-
-                return response.json().get("response", "")
-
-            except requests.exceptions.ReadTimeout:
-                print(f"⏳ LLM timeout ({attempt}/{max_retries})")
-                time.sleep(2 * attempt)
-
-            except Exception as e:
-                print(f"⚠️ LLM error: {e}")
-                _LAST_FAILURE_TS = time.time()
-                break
-
-    # -------------------------------
-    # Graceful fallback
-    # -------------------------------
-    return "⚠️ Insight generation unavailable."
+    return response or "⚠️ Insight generation unavailable."

@@ -2,19 +2,9 @@
 
 import json
 import re
-import requests
 from functools import lru_cache
 
-# ==================================================
-# BACKEND CONFIG (NO HARDCODED VALUES)
-# ==================================================
-try:
-    from config.llm import LLM_ENABLED, OLLAMA_URL, LLM_MODEL
-except ImportError:
-    # Safe defaults if config not present
-    LLM_ENABLED = True
-    OLLAMA_URL = "http://localhost:11434/api/generate"
-    LLM_MODEL = "llama3"
+from llm.adapter import generate_text, is_llm_enabled
 
 
 # ==================================================
@@ -60,7 +50,7 @@ def llm_is_business(name: str) -> bool:
     if not name or name.strip().lower() in {"unknown", "na"}:
         return False
 
-    if not LLM_ENABLED:
+    if not is_llm_enabled():
         # Conservative default in finance
         return True
 
@@ -81,23 +71,17 @@ Output:
     # LLM Call
     # -------------------------------
     try:
-        resp = requests.post(
-            OLLAMA_URL,
-            json={
-                "model": "qwen2.5:1.5b",
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.0,   # 🔒 deterministic
-                    "top_p": 1.0
-                }
-            },
-            timeout=15
+        raw = generate_text(
+            prompt=prompt,
+            temperature=0.0,
+            top_p=1.0,
+            timeout=15,
+            return_none_on_fail=True,
+            model="qwen2.5:1.5b",
         )
 
-        resp.raise_for_status()
-
-        raw = resp.json().get("response", "")
+        if not raw:
+            return True  # finance-safe default
 
         # -------------------------------
         # Strict JSON extraction

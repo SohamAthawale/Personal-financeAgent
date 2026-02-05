@@ -26,8 +26,13 @@ Defaults live in `config/llm.py` and `db.py`.
 | `DATABASE_URL` | `postgresql+psycopg2://finance_user@localhost:5432/finance_agent` | SQLAlchemy database URL |
 | `JWT_SECRET_KEY` | `super-secret-key` | JWT signing key (set this in real deployments) |
 | `LLM_ENABLED` | `true` | Enable or disable LLM calls |
+| `LLM_PROVIDER` | `ollama` | LLM provider (`ollama` or `openai_compatible`) |
 | `OLLAMA_URL` | `http://localhost:11434/api/generate` | Ollama generate endpoint |
 | `LLM_MODEL` | `qwen2.5:7b-instruct` | Ollama model name |
+| `OPENAI_API_KEY` | `""` | OpenAI-compatible API key (if used) |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Base URL for OpenAI-compatible providers |
+| `MAX_CONTENT_LENGTH_MB` | `15` | Maximum upload size in MB |
+| `RATE_LIMIT_STATEMENT_PARSE` | `5 per minute` | Rate limit for `/api/statement/parse` |
 
 A starter file is provided at `.env.example`.
 
@@ -115,6 +120,7 @@ curl -X POST http://127.0.0.1:5000/api/goals \
 - `POST /api/statement/parse`
 - `GET /api/statement/analytics`
 - `GET /api/statement/insights`
+- `GET /api/statement/insights/history`
 - `POST /api/agent/recommendations`
 - `GET /api/goals`
 - `POST /api/goals`

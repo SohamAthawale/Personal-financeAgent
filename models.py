@@ -134,9 +134,41 @@ class FinancialGoal(Base):
 
 
 # =========================
+# INSIGHT SNAPSHOTS
+# =========================
+class InsightSnapshot(Base):
+    __tablename__ = "insight_snapshots"
+
+    id = Column(Integer, primary_key=True)
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    snapshot_month = Column(Date, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    financial_summary = Column(JSON)
+    category_insights = Column(JSON)
+    transaction_patterns = Column(JSON)
+    metrics = Column(JSON)
+
+    user = relationship("User", backref="insight_snapshots")
+
+
+# =========================
 # INDEXES (performance)
 # =========================
 Index("ix_statement_user", Statement.user_id)
 Index("ix_transaction_date", Transaction.date)
 Index("ix_transaction_statement", Transaction.statement_id)
 Index("ix_goal_user_active", FinancialGoal.user_id, FinancialGoal.is_active)
+Index(
+    "ix_insight_user_month",
+    InsightSnapshot.user_id,
+    InsightSnapshot.snapshot_month,
+    unique=True
+)

@@ -75,7 +75,7 @@ if confidence >= 0.9:
 else:
     final = retry_with_variants(rows, choose_best_hypothesis)
     if final["decision"] == "needs_arbitration":
-        arb = llm_arbitrate([final])
+        arb = llm_arbitrate(final.get("candidates", []))
         if arb:
             final = arb
 

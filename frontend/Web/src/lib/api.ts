@@ -2,6 +2,7 @@ import {
   AuthResponse,
   LoginResponse,
   InsightsApiResponse,
+  InsightsHistoryResponse,
   RecommendationsApiResponse,
   ParseResponse,
   Goal,
@@ -240,6 +241,26 @@ export const api = {
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.message || 'Failed to fetch insights');
+    }
+
+    return res.json();
+  },
+
+  async getInsightsHistory(
+    token: string,
+    limit = 12
+  ): Promise<InsightsHistoryResponse> {
+    const params = new URLSearchParams();
+    params.append('limit', String(limit));
+
+    const res = await fetch(
+      `${API_BASE}/api/statement/insights/history?${params}`,
+      { headers: authHeaders(token) }
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to fetch insights history');
     }
 
     return res.json();

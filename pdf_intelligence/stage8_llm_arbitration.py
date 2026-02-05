@@ -1,19 +1,9 @@
 # pdf_intelligence/stage8_llm_arbitration.py
 
 import json
-import requests
 from typing import List, Dict, Any
 
-# ==================================================
-# BACKEND CONFIG (NO HARDCODED VALUES)
-# ==================================================
-try:
-    from config.llm import LLM_ENABLED, OLLAMA_URL, LLM_MODEL
-except ImportError:
-    # Safe defaults
-    LLM_ENABLED = True
-    OLLAMA_URL = "http://localhost:11434/api/generate"
-    LLM_MODEL = "llama3"
+from llm.adapter import generate_text, is_llm_enabled
 
 
 # ==================================================
@@ -59,7 +49,7 @@ def llm_arbitrate(
     # -------------------------------
     # Hard guards
     # -------------------------------
-    if not LLM_ENABLED:
+    if not is_llm_enabled():
         return None
 
     if not candidates or len(candidates) < 2:
@@ -84,23 +74,16 @@ Output JSON:
     # LLM Call
     # -------------------------------
     try:
-        resp = requests.post(
-            OLLAMA_URL,
-            json={
-                "model": LLM_MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.0,  # 🔒 deterministic
-                    "top_p": 1.0
-                },
-            },
+        raw = generate_text(
+            prompt=prompt,
+            temperature=0.0,
+            top_p=1.0,
             timeout=30,
+            return_none_on_fail=True,
         )
 
-        resp.raise_for_status()
-
-        raw = resp.json().get("response", "")
+        if not raw:
+            return None
 
         # -------------------------------
         # Strict JSON extraction

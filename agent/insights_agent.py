@@ -1,20 +1,14 @@
 # analytics/insights_agent.py
 
 import json
-import requests
-import time
 from typing import List, Dict, Any
 
-# ==================================================
-# BACKEND CONFIG (NO HARDCODED VALUES)
-# ==================================================
+from llm.adapter import generate_text, is_llm_enabled
+
 try:
-    from config.llm import LLM_ENABLED, OLLAMA_URL, LLM_MODEL
+    from config.llm import LLM_MODEL
 except ImportError:
-    # Safe defaults
-    LLM_ENABLED = True
-    OLLAMA_URL = "http://localhost:11434/api/generate"
-    LLM_MODEL = "llama3"
+    LLM_MODEL = None
 
 
 # ======================================================
@@ -82,7 +76,7 @@ def generate_insights(
     # -------------------------------
     # Hard guards
     # -------------------------------
-    if not LLM_ENABLED:
+    if not is_llm_enabled():
         return {
             "type": "llm_insight",
             "model": None,
@@ -138,39 +132,23 @@ If unsure, REPEAT the provided numbers instead of guessing.
 """
 
     # -------------------------------
-    # 🔁 Retry-safe Ollama Call
+    # 🔁 Adapter-backed LLM Call
     # -------------------------------
-    for attempt in range(1, max_retries + 1):
-        try:
-            response = requests.post(
-                OLLAMA_URL,
-                json={
-                    "model": LLM_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.1,   # 🔒 low creativity
-                        "top_p": 0.9,
-                    },
-                },
-                timeout=90,
-            )
+    content = generate_text(
+        prompt=prompt,
+        temperature=0.1,
+        top_p=0.9,
+        timeout=90,
+        max_retries=max_retries,
+        return_none_on_fail=True,
+    )
 
-            response.raise_for_status()
-
-            return {
-                "type": "llm_insight",
-                "model": LLM_MODEL,
-                "content": response.json().get("response", ""),
-            }
-
-        except requests.exceptions.ReadTimeout:
-            print(f"⏳ LLM timeout (attempt {attempt}/{max_retries})")
-            time.sleep(2 * attempt)
-
-        except Exception as e:
-            print(f"⚠️ LLM error: {e}")
-            break
+    if content:
+        return {
+            "type": "llm_insight",
+            "model": LLM_MODEL,
+            "content": content,
+        }
 
     # -------------------------------
     # 🧯 Graceful Fallback

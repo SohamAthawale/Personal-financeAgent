@@ -7,7 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from db import engine, SessionLocal
-from models import User, FinancialGoal
+from models import User, FinancialGoal, InsightSnapshot
 
 from agent.goal_parser import parse_user_goals
 from pipeline.core import (
@@ -19,6 +19,12 @@ from pipeline.core import (
 
 from flask_cors import CORS
 from dateutil.relativedelta import relativedelta
+
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_limiter.errors import RateLimitExceeded
+
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from flask_jwt_extended import (
     JWTManager,
@@ -32,6 +38,15 @@ from flask_jwt_extended import (
 # ==================================================
 app = Flask(__name__)
 
+# --------------------------------------------------
+# Upload size limits (global)
+# --------------------------------------------------
+try:
+    max_upload_mb = int(os.getenv("MAX_CONTENT_LENGTH_MB", "15"))
+except ValueError:
+    max_upload_mb = 15
+app.config["MAX_CONTENT_LENGTH"] = max_upload_mb * 1024 * 1024
+
 # 🔐 JWT CORE CONFIG (ORDER MATTERS)
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secret-key")
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
@@ -42,6 +57,25 @@ app.config["JWT_HEADER_NAME"] = "Authorization"
 app.config["JWT_HEADER_TYPE"] = "Bearer"
 
 jwt = JWTManager(app)
+
+# --------------------------------------------------
+# Rate limiting (per user if JWT is present, else IP)
+# --------------------------------------------------
+def rate_limit_key():
+    try:
+        identity = get_jwt_identity()
+        if identity:
+            return f"user:{identity}"
+    except Exception:
+        pass
+    return get_remote_address()
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=[],
+)
 
 # ==================================================
 # JWT DEBUGGING (CRITICAL DURING DEV)
@@ -55,6 +89,24 @@ def invalid_token(reason):
 def missing_token(reason):
     print("❌ MISSING JWT:", reason)
     return jsonify({"message": reason}), 401
+
+# ==================================================
+# ERROR HANDLERS
+# ==================================================
+@app.errorhandler(RequestEntityTooLarge)
+def handle_request_too_large(_e):
+    return (
+        jsonify({"message": f"File too large. Max {max_upload_mb} MB."}),
+        413,
+    )
+
+
+@app.errorhandler(RateLimitExceeded)
+def handle_rate_limit(_e):
+    return (
+        jsonify({"message": "Rate limit exceeded. Try again later."}),
+        429,
+    )
 
 # ==================================================
 # CORS
@@ -148,6 +200,7 @@ def login():
 # ==================================================
 @app.route("/api/statement/parse", methods=["POST"])
 @jwt_required()
+@limiter.limit(os.getenv("RATE_LIMIT_STATEMENT_PARSE", "5 per minute"))
 def parse_statement_route():
     if "file" not in request.files:
         return {"message": "file required"}, 400
@@ -267,6 +320,47 @@ def insights_route():
             force_refresh=force_refresh,
         )
         return jsonify(result)
+    finally:
+        db.close()
+
+
+@app.route("/api/statement/insights/history", methods=["GET"])
+@jwt_required()
+def insights_history_route():
+    limit_raw = request.args.get("limit", "12")
+    try:
+        limit = max(1, min(int(limit_raw), 24))
+    except ValueError:
+        limit = 12
+
+    db = SessionLocal()
+    try:
+        user = get_current_user(db)
+        if not user:
+            return {"message": "user not found"}, 404
+
+        snapshots = (
+            db.query(InsightSnapshot)
+            .filter(InsightSnapshot.user_id == user.id)
+            .order_by(InsightSnapshot.snapshot_month.desc())
+            .limit(limit)
+            .all()
+        )
+
+        return {
+            "status": "success",
+            "snapshots": [
+                {
+                    "month": s.snapshot_month.isoformat(),
+                    "created_at": s.created_at.isoformat(),
+                    "financial_summary": s.financial_summary,
+                    "category_insights": s.category_insights,
+                    "transaction_patterns": s.transaction_patterns,
+                    "metrics": s.metrics,
+                }
+                for s in snapshots
+            ],
+        }
     finally:
         db.close()
 
