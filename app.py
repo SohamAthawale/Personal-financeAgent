@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+import os
 import tempfile
 from datetime import datetime
 
@@ -32,7 +33,7 @@ from flask_jwt_extended import (
 app = Flask(__name__)
 
 # 🔐 JWT CORE CONFIG (ORDER MATTERS)
-app.config["JWT_SECRET_KEY"] = "super-secret-key"  # MOVE TO ENV
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secret-key")
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
 
 # 🔴 REQUIRED: TELL JWT TO READ FROM HEADERS

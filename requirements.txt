@@ -1,0 +1,11 @@
+flask
+flask-cors
+flask-jwt-extended
+sqlalchemy
+psycopg2-binary
+python-dateutil
+PyMuPDF
+pandas
+numpy
+requests
+scikit-learn
