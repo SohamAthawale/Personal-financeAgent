@@ -59,6 +59,30 @@ python app.py
 
 The API runs at `http://127.0.0.1:5000` by default.
 
+## Remote LLM (Tailscale)
+If you want the app hosted on a server but run the LLM on your local machine:
+
+1. Install Tailscale on both machines and log into the same tailnet.
+2. On the LLM host, expose Ollama through Tailscale Serve:
+
+```bash
+tailscale serve --bg 11434
+```
+
+3. Confirm from the server:
+
+```bash
+curl https://<your-tailnet-host>.ts.net/api/tags
+```
+
+4. Set these on the server and restart the app:
+
+```bash
+LLM_ENABLED=true
+LLM_PROVIDER=ollama
+OLLAMA_URL=https://<your-tailnet-host>.ts.net/api/generate
+```
+
 ## Frontend Setup
 1. `cd frontend/Web`
 2. `npm install`
