@@ -10,7 +10,9 @@ SUMMARY_KEYWORDS = [
 CR_REGEX = re.compile(r"([\d,]+\.\d{2})\s*\(cr\)", re.IGNORECASE)
 DR_REGEX = re.compile(r"([\d,]+\.\d{2})\s*\(dr\)", re.IGNORECASE)
 
-BALANCE_NUMBER_REGEX = re.compile(r"\b\d{1,3}(?:,\d{3})*\.\d{2}\b")
+BALANCE_NUMBER_REGEX = re.compile(
+    r"\b(?:\d+\.\d{2}|\d{1,3}(?:,\d{3})*\.\d{2}|\d{1,3}(?:,\d{2})+,\d{3}\.\d{2})\b"
+)
 
 
 # --------------------------------------------------

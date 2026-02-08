@@ -16,6 +16,7 @@ from pipeline.core import (
     generate_insights_view,
     run_agent_view,
 )
+from llm.adapter import check_llm_health
 
 from flask_cors import CORS
 from dateutil.relativedelta import relativedelta
@@ -239,6 +240,25 @@ from db import SessionLocal
 from models import User
 
 
+def _resolve_analytics_window(
+    *,
+    month: str | None,
+    period: str | None,
+):
+    start_date = None
+    end_date = None
+
+    if month:
+        start_date = datetime.strptime(month, "%Y-%m")
+        end_date = start_date + relativedelta(months=1)
+    elif period:
+        months = int(period.replace("m", ""))
+        end_date = datetime.utcnow()
+        start_date = end_date - relativedelta(months=months)
+
+    return start_date, end_date
+
+
 @app.route("/api/statement/analytics", methods=["GET"])
 @jwt_required()
 def analytics_route():
@@ -256,20 +276,10 @@ def analytics_route():
     month = request.args.get("month")
     period = request.args.get("period")
 
-    start_date = None
-    end_date = None
-
-    # --------------------------------------------------
-    # Resolve date window
-    # --------------------------------------------------
-    if month:
-        start_date = datetime.strptime(month, "%Y-%m")
-        end_date = start_date + relativedelta(months=1)
-
-    elif period:
-        months = int(period.replace("m", ""))
-        end_date = datetime.utcnow()
-        start_date = end_date - relativedelta(months=months)
+    start_date, end_date = _resolve_analytics_window(
+        month=month,
+        period=period,
+    )
 
     db = SessionLocal()
     try:
@@ -294,6 +304,70 @@ def analytics_route():
             end_date=end_date,
         )
 
+        return jsonify(result)
+
+    finally:
+        db.close()
+
+
+@app.route("/api/statement/analytics/rerun", methods=["POST"])
+@jwt_required()
+def analytics_rerun_route():
+    """
+    Force a full reprocessing of transaction categorization,
+    then return analytics for the requested window.
+    """
+    month = request.args.get("month")
+    period = request.args.get("period")
+
+    start_date, end_date = _resolve_analytics_window(
+        month=month,
+        period=period,
+    )
+
+    db = SessionLocal()
+    try:
+        user = get_current_user(db)
+        if not user:
+            return {"message": "user not found"}, 404
+
+        # Reset non-user categories for a clean reprocess
+        db.execute(text("""
+            UPDATE transactions
+            SET
+                category = NULL,
+                category_confidence = NULL,
+                category_source = NULL
+            WHERE id IN (
+                SELECT t.id
+                FROM transactions t
+                JOIN statements s ON t.statement_id = s.id
+                WHERE s.user_id = :user_id
+                  AND (t.category_source IS NULL OR t.category_source != 'user')
+            )
+        """), {"user_id": user.id})
+
+        db.commit()
+
+        # Rebuild categories across the full dataset
+        all_time_result = compute_analytics(
+            db=db,
+            user_id=user.id,
+            start_date=None,
+            end_date=None,
+        )
+
+        if start_date or end_date:
+            result = compute_analytics(
+                db=db,
+                user_id=user.id,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        else:
+            result = all_time_result
+
+        result["llm_status"] = check_llm_health()
         return jsonify(result)
 
     finally:

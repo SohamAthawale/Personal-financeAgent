@@ -1,6 +1,8 @@
 import re
 
-AMOUNT_REGEX = re.compile(r"\d{1,3}(?:,\d{3})*\.\d{2}")
+AMOUNT_REGEX = re.compile(
+    r"\b(?:\d+\.\d{2}|\d{1,3}(?:,\d{3})*\.\d{2}|\d{1,3}(?:,\d{2})+,\d{3}\.\d{2})\b"
+)
 
 
 def extract_amount(row, target_x, tol=15):
@@ -8,10 +10,15 @@ def extract_amount(row, target_x, tol=15):
         return None
 
     for w in row:
-        if abs(w["x0"] - target_x) <= tol:
-            m = AMOUNT_REGEX.search(w["text"])
-            if m:
-                return float(m.group().replace(",", ""))
+        m = AMOUNT_REGEX.search(w["text"])
+        if not m:
+            continue
+
+        if (
+            abs(w["x0"] - target_x) <= tol
+            or abs(w["x1"] - target_x) <= tol
+        ):
+            return float(m.group().replace(",", ""))
 
     return None
 

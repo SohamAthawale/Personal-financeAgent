@@ -222,6 +222,31 @@ export const api = {
     return res.json();
   },
 
+  async rerunAnalytics(
+    token: string,
+    params: { month?: string; period?: string }
+  ): Promise<AnalyticsApiResponse> {
+    const search = new URLSearchParams();
+
+    if (params.month) search.append('month', params.month);
+    if (params.period) search.append('period', params.period);
+
+    const res = await fetch(
+      `${API_BASE}/api/statement/analytics/rerun?${search}`,
+      {
+        method: 'POST',
+        headers: authHeaders(token),
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to reprocess analytics');
+    }
+
+    return res.json();
+  },
+
   /* =========================
      Insights
      ========================= */

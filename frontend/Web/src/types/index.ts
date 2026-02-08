@@ -116,7 +116,7 @@ export interface AnalyticsMetrics {
 }
 
 export interface AnalyticsApiResponse {
-  status: 'success' | 'error';
+  status: 'success' | 'error' | 'no_data';
   message?: string;
 
   metrics?: {
@@ -129,6 +129,29 @@ export interface AnalyticsApiResponse {
     category: string;
     expense: number;
   }>;
+
+  trends?: {
+    monthly?: Array<{
+      month: string;
+      income: number;
+      expense: number;
+      savings: number;
+    }>;
+    yearly?: Array<{
+      year: string;
+      income: number;
+      expense: number;
+      savings: number;
+    }>;
+  };
+
+  llm_status?: {
+    status: 'ok' | 'disabled' | 'unavailable' | 'error';
+    message?: string;
+    provider?: string;
+    model?: string;
+    checked_at?: string;
+  };
 }
 export interface InsightsApiResponse {
   status: 'success' | 'error';

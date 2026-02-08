@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 from threading import Lock
 from typing import Optional
 
@@ -181,3 +182,62 @@ def generate_text(
                 break
 
     return None if return_none_on_fail else "⚠️ Insight generation unavailable."
+
+
+def check_llm_health(
+    *,
+    timeout: int = 5,
+    model: str | None = None,
+) -> dict:
+    """
+    Lightweight health check for the configured LLM.
+    Returns a structured status payload for UI consumption.
+    """
+    checked_at = datetime.utcnow().isoformat()
+    provider = (LLM_PROVIDER or "unknown").lower()
+    selected_model = model or LLM_MODEL
+
+    if not LLM_ENABLED:
+        return {
+            "status": "disabled",
+            "message": "LLM disabled by server configuration.",
+            "provider": provider,
+            "model": selected_model,
+            "checked_at": checked_at,
+        }
+
+    try:
+        response = generate_text(
+            prompt="ping",
+            temperature=0.0,
+            top_p=1.0,
+            timeout=timeout,
+            max_retries=1,
+            return_none_on_fail=True,
+            model=selected_model,
+        )
+
+        if response:
+            return {
+                "status": "ok",
+                "provider": provider,
+                "model": selected_model,
+                "checked_at": checked_at,
+            }
+
+        return {
+            "status": "unavailable",
+            "message": "LLM call failed or timed out.",
+            "provider": provider,
+            "model": selected_model,
+            "checked_at": checked_at,
+        }
+
+    except Exception as exc:
+        return {
+            "status": "error",
+            "message": str(exc),
+            "provider": provider,
+            "model": selected_model,
+            "checked_at": checked_at,
+        }
