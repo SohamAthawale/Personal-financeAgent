@@ -237,95 +237,169 @@ export function Dashboard() {
     return `${(value * 100).toFixed(0)}%`;
   };
 
+  const needsReviewCount = transactions.filter((tx) => tx.needs_review).length;
+  const correctedCount = transactions.filter((tx) => tx.corrected).length;
+
   /* =======================
      Render
      ======================= */
 
   if (!auth) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
+      <div className="min-h-screen flex items-center justify-center text-muted">
         Please log in.
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8 max-w-7xl mx-auto space-y-8">
-      <h1 className="text-3xl font-bold">Financial Dashboard</h1>
-
-      {/* Upload Card */}
-      <div
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-        className={`rounded-xl border-2 border-dashed p-10 text-center transition ${
-          dragActive
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-300 bg-white'
-        }`}
-      >
-        <input
-          type="file"
-          accept=".pdf"
-          id="file"
-          className="hidden"
-          onChange={(e) => e.target.files && handleFile(e.target.files[0])}
-        />
-        <Upload className="w-10 h-10 mx-auto text-gray-400 mb-3" />
-        <label htmlFor="file" className="cursor-pointer text-blue-600">
-          Upload bank statement (PDF)
-        </label>
-
-        {uploadStatus.status === 'uploading' && (
-          <div className="mt-4 text-sm text-gray-600">
-            <Loader className="animate-spin mx-auto mb-2" />
-            {uploadStatus.message}
+    <div className="app-container space-y-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-2">
+          <p className="eyebrow">Dashboard</p>
+          <h1 className="text-4xl font-semibold text-ink">
+            Financial command center
+          </h1>
+          <p className="text-muted">
+            Upload statements, review AI categories, and keep your ledger clean.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <div className="card-muted px-4 py-3 text-sm">
+            <p className="text-xs uppercase tracking-[0.3em] text-muted">
+              Transactions
+            </p>
+            <p className="text-lg font-semibold text-ink">
+              {transactions.length}
+            </p>
           </div>
-        )}
+          <div className="card-muted px-4 py-3 text-sm">
+            <p className="text-xs uppercase tracking-[0.3em] text-muted">
+              Needs review
+            </p>
+            <p className="text-lg font-semibold text-ink">
+              {needsReviewCount}
+            </p>
+          </div>
+          <div className="card-muted px-4 py-3 text-sm">
+            <p className="text-xs uppercase tracking-[0.3em] text-muted">
+              Corrected
+            </p>
+            <p className="text-lg font-semibold text-ink">
+              {correctedCount}
+            </p>
+          </div>
+        </div>
+      </div>
 
-        {uploadStatus.status === 'success' && (
-          <CheckCircle className="mx-auto text-green-500 mt-4" />
-        )}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr),minmax(0,1fr)]">
+        <div
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+          className={`upload-drop ${dragActive ? 'upload-drop-active' : ''}`}
+        >
+          <input
+            type="file"
+            accept=".pdf"
+            id="file"
+            className="hidden"
+            onChange={(e) => e.target.files && handleFile(e.target.files[0])}
+          />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-muted text-primary">
+            <Upload className="w-6 h-6" />
+          </div>
+          <h2 className="mt-4 text-xl font-semibold text-ink">
+            Upload a statement
+          </h2>
+          <p className="text-sm text-muted">
+            Drag and drop a PDF, or select a file to begin parsing.
+          </p>
+          <label htmlFor="file" className="btn-primary mt-6 inline-flex">
+            Choose PDF
+          </label>
 
-        {uploadStatus.status === 'error' && (
-          <AlertCircle className="mx-auto text-red-500 mt-4" />
-        )}
+          {uploadStatus.status !== 'idle' && (
+            <div className="mt-6 space-y-3 text-left">
+              <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-muted">
+                <span>{uploadStatus.stage ?? 'Processing'}</span>
+                <span>{uploadStatus.progress}%</span>
+              </div>
+              <div className="progress-track">
+                <div
+                  className="progress-fill"
+                  style={{ width: `${uploadStatus.progress}%` }}
+                />
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted">
+                {uploadStatus.status === 'uploading' && (
+                  <Loader className="w-4 h-4 animate-spin text-primary" />
+                )}
+                {uploadStatus.status === 'success' && (
+                  <CheckCircle className="w-4 h-4 text-success" />
+                )}
+                {uploadStatus.status === 'error' && (
+                  <AlertCircle className="w-4 h-4 text-danger" />
+                )}
+                <span>{uploadStatus.message}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="card p-6 space-y-4">
+          <div className="space-y-1">
+            <p className="eyebrow">Status</p>
+            <h3 className="section-title">Parsing summary</h3>
+          </div>
+          <div className="divider" />
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted">Last statement ID</span>
+              <span className="font-semibold text-ink">
+                {lastParse?.statement_id ?? 'n/a'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted">Transactions parsed</span>
+              <span className="font-semibold text-ink">
+                {lastParse?.transaction_count ??
+                  lastParse?.transactions_count ??
+                  'n/a'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted">Schema confidence</span>
+              <span className="font-semibold text-ink">
+                {formatPercent(lastParse?.schema_confidence)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted">Variant</span>
+              <span className="font-semibold text-ink">
+                {lastParse?.schema_variant ?? 'n/a'}
+              </span>
+            </div>
+          </div>
+          <div className="divider" />
+          <p className="text-sm text-muted">
+            Review flagged transactions to keep future classifications sharp.
+          </p>
+        </div>
       </div>
 
       {lastParse?.status === 'success' && (
-        <div className="bg-white rounded-xl shadow p-6">
-          <h2 className="font-semibold mb-4">Latest Parse Trace</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-700">
-            <div>
-              <div className="text-xs text-gray-500">Statement ID</div>
-              <div className="font-medium">{lastParse.statement_id ?? 'n/a'}</div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Transactions</div>
-              <div className="font-medium">
-                {lastParse.transaction_count ??
-                  lastParse.transactions_count ??
-                  'n/a'}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Schema Confidence</div>
-              <div className="font-medium">
-                {formatPercent(lastParse.schema_confidence)}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Variant</div>
-              <div className="font-medium">{lastParse.schema_variant ?? 'n/a'}</div>
-            </div>
+        <div className="card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="section-title">Latest parse trace</h2>
+            <span className="badge badge-success">Success</span>
           </div>
 
           {lastParse.trace && (
-            <div className="mt-4 text-xs text-gray-700 space-y-2">
+            <div className="space-y-3 text-sm text-muted">
               <div>
-                <span className="text-gray-500">Initial:</span>{' '}
+                <span className="font-semibold text-ink">Initial:</span>{' '}
                 {formatPercent(lastParse.trace.initial?.confidence)}{' '}
                 {lastParse.trace.initial?.schema_type
                   ? `(${lastParse.trace.initial?.schema_type})`
@@ -334,7 +408,7 @@ export function Dashboard() {
 
               {lastParse.trace.retry && (
                 <div>
-                  <span className="text-gray-500">Retry:</span>{' '}
+                  <span className="font-semibold text-ink">Retry:</span>{' '}
                   {lastParse.trace.retry.decision ?? 'n/a'}
                 </div>
               )}
@@ -345,7 +419,7 @@ export function Dashboard() {
                     {lastParse.trace.retry.candidates.map((c, idx) => (
                       <span
                         key={`${c.variant}-${idx}`}
-                        className="bg-gray-100 text-gray-700 px-2 py-1 rounded"
+                        className="badge"
                       >
                         {c.variant ?? 'variant'} · {formatPercent(c.confidence)}
                         {c.schema_type ? ` · ${c.schema_type}` : ''}
@@ -356,7 +430,7 @@ export function Dashboard() {
 
               {lastParse.trace.arbitration?.used && (
                 <div>
-                  <span className="text-gray-500">Arbitration:</span>{' '}
+                  <span className="font-semibold text-ink">Arbitration:</span>{' '}
                   {lastParse.trace.arbitration.status ?? 'used'}
                   {lastParse.trace.arbitration.winner_variant
                     ? ` · ${lastParse.trace.arbitration.winner_variant}`
@@ -373,78 +447,88 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Transactions */}
-      <div className="bg-white rounded-xl shadow p-6">
-        <h2 className="font-semibold mb-4">Transactions</h2>
+      <div className="card p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="section-title">Transactions</h2>
+          <span className="badge">
+            {transactions.length} total
+          </span>
+        </div>
 
-        {loadingTx && <p>Loading transactions...</p>}
+        {loadingTx && <p className="mt-4">Loading transactions...</p>}
 
         {!loadingTx && transactions.length === 0 && (
-          <p className="text-sm text-gray-500 text-center">
+          <p className="text-sm text-muted text-center mt-6">
             No transactions yet. Upload a statement to begin.
           </p>
         )}
 
         {transactions.length > 0 && (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left">
-                <th>Date</th>
-                <th>Description</th>
-                <th>Category</th>
-                <th className="text-right">Amount</th>
-                <th>Confidence</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map((tx) => (
-                <tr
-                  key={tx.id}
-                  className={`border-b ${
-                    tx.needs_review ? 'bg-yellow-50' : ''
-                  }`}
-                >
-                  <td>{tx.date.slice(0, 10)}</td>
-                  <td>{tx.description}</td>
-                  <td>{tx.category}</td>
-                  <td className="text-right">{tx.amount.toFixed(2)}</td>
-                  <td>
-                    <span
-                      className={`px-2 py-1 rounded text-xs ${
-                        tx.confidence > 0.9
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}
-                    >
-                      {(tx.confidence * 100).toFixed(0)}%
-                    </span>
-                  </td>
-                  <td className="text-right space-x-2">
-                    <button
-                      onClick={() => openExplain(tx.id)}
-                      className="text-blue-600 text-xs inline-flex items-center gap-1"
-                    >
-                      <Info size={12} /> Explain
-                    </button>
-                    <button
-                      onClick={() => openEdit(tx)}
-                      className="text-gray-600 text-xs inline-flex items-center gap-1"
-                    >
-                      <Pencil size={12} /> Edit
-                    </button>
-                  </td>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left">
+                  <th className="table-head pb-3">Date</th>
+                  <th className="table-head pb-3">Description</th>
+                  <th className="table-head pb-3">Category</th>
+                  <th className="table-head pb-3 text-right">Amount</th>
+                  <th className="table-head pb-3">Confidence</th>
+                  <th className="table-head pb-3 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {transactions.map((tx) => (
+                  <tr
+                    key={tx.id}
+                    className={`table-row ${
+                      tx.needs_review ? 'bg-warning/10' : ''
+                    }`}
+                  >
+                    <td className="py-3 pr-4">{tx.date.slice(0, 10)}</td>
+                    <td className="py-3 pr-4 text-ink">{tx.description}</td>
+                    <td className="py-3 pr-4">
+                      <span className="badge">{tx.category}</span>
+                    </td>
+                    <td className="py-3 pr-4 text-right font-semibold text-ink">
+                      {tx.amount.toFixed(2)}
+                    </td>
+                    <td className="py-3 pr-4">
+                      <span
+                        className={`badge ${
+                          tx.confidence > 0.9
+                            ? 'badge-success'
+                            : 'badge-warning'
+                        }`}
+                      >
+                        {(tx.confidence * 100).toFixed(0)}%
+                      </span>
+                    </td>
+                    <td className="py-3 text-right space-x-2">
+                      <button
+                        onClick={() => openExplain(tx.id)}
+                        className="btn-ghost text-xs"
+                      >
+                        <Info size={12} /> Explain
+                      </button>
+                      <button
+                        onClick={() => openEdit(tx)}
+                        className="btn-ghost text-xs"
+                      >
+                        <Pencil size={12} /> Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
       {/* Modals */}
       {explainTx && (
         <Modal onClose={() => setExplainTx(null)}>
-          <pre className="text-xs bg-gray-100 p-4 rounded">
+          <pre className="text-xs bg-surface-muted p-4 rounded-2xl">
             {JSON.stringify(explainTx, null, 2)}
           </pre>
         </Modal>
@@ -452,14 +536,14 @@ export function Dashboard() {
 
       {editTx && (
         <Modal onClose={() => setEditTx(null)}>
-          <h3 className="font-semibold mb-3">Edit Transaction</h3>
+          <h3 className="section-title mb-3">Edit Transaction</h3>
           <input
-            className="border p-2 w-full mb-2"
+            className="input mb-2"
             value={editMerchant}
             onChange={(e) => setEditMerchant(e.target.value)}
           />
           <input
-            className="border p-2 w-full mb-2"
+            className="input mb-2"
             value={editCategory}
             onChange={(e) => setEditCategory(e.target.value)}
           />
@@ -471,10 +555,7 @@ export function Dashboard() {
             />
             Remember this correction
           </label>
-          <button
-            onClick={saveEdit}
-            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded"
-          >
+          <button onClick={saveEdit} className="btn-primary mt-4">
             Save
           </button>
         </Modal>
@@ -501,11 +582,11 @@ function Modal({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 max-w-lg w-full">
+    <div className="modal-backdrop">
+      <div className="modal-card">
         {children}
         <div className="text-right mt-4">
-          <button onClick={onClose} className="text-blue-600 text-sm">
+          <button onClick={onClose} className="btn-ghost text-sm">
             Close
           </button>
         </div>

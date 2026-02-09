@@ -41,27 +41,46 @@ export function Navigation({
     auth?.user?.email ||
     'Logged in';
 
+  const getInitials = (value: string) => {
+    const cleaned = value.replace(/[^a-zA-Z0-9 ]/g, ' ').trim();
+    if (!cleaned) return 'U';
+    const parts = cleaned.split(/\s+/);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+    return cleaned.slice(0, 2).toUpperCase();
+  };
+
   return (
-    <nav className="bg-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-blue-600">
-              FA
-            </h1>
+    <nav className="nav-shell">
+      <div className="app-container px-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 py-4">
+          <div className="flex items-center gap-3">
+            <img
+              src="/brand-mark.svg"
+              alt="Personal Finance Agent"
+              className="h-10 w-10"
+            />
+            <div className="leading-tight">
+              <p className="text-base font-semibold text-ink">
+                Personal Finance Agent
+              </p>
+              <p className="text-xs uppercase tracking-[0.3em] text-muted">
+                Clarity first
+              </p>
+            </div>
           </div>
 
           {/* Desktop menu */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-2 rounded-full border border-line bg-white/70 p-1 shadow-soft">
             {pages.map((page) => (
               <button
                 key={page.id}
                 onClick={() => handlePageChange(page.id)}
-                className={`font-medium transition ${
-                  currentPage === page.id
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
+                className={`nav-pill ${
+                  currentPage === page.id ? 'nav-pill-active' : ''
                 }`}
+                aria-current={currentPage === page.id ? 'page' : undefined}
               >
                 {page.label}
               </button>
@@ -69,13 +88,23 @@ export function Navigation({
           </div>
 
           {/* Desktop user info */}
-          <div className="hidden md:flex items-center gap-4">
-            <span className="text-sm text-gray-600">
-              {userLabel}
-            </span>
+          <div className="hidden md:flex items-center gap-3">
+            <div className="flex items-center gap-3 rounded-full border border-line bg-white px-3 py-2 shadow-soft">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
+                {getInitials(userLabel)}
+              </div>
+              <div className="leading-tight">
+                <p className="text-xs uppercase tracking-[0.3em] text-muted">
+                  Signed in
+                </p>
+                <p className="text-sm font-semibold text-ink">
+                  {userLabel}
+                </p>
+              </div>
+            </div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition font-medium"
+              className="btn-ghost"
             >
               <LogOut className="w-4 h-4" />
               Logout
@@ -85,7 +114,7 @@ export function Navigation({
           {/* Mobile menu toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden text-gray-600"
+            className="md:hidden rounded-full border border-line bg-white p-2 text-muted shadow-soft"
           >
             {mobileMenuOpen ? (
               <X className="w-6 h-6" />
@@ -97,29 +126,36 @@ export function Navigation({
 
         {/* Mobile menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden pb-4 border-t border-gray-200">
-            {pages.map((page) => (
-              <button
-                key={page.id}
-                onClick={() => handlePageChange(page.id)}
-                className={`block w-full text-left py-2 px-4 font-medium transition ${
-                  currentPage === page.id
-                    ? 'text-blue-600 bg-blue-50'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                {page.label}
-              </button>
-            ))}
+          <div className="md:hidden space-y-3 border-t border-line pb-4 pt-4">
+            <div className="grid gap-2 rounded-3xl border border-line bg-white/80 p-2 shadow-soft">
+              {pages.map((page) => (
+                <button
+                  key={page.id}
+                  onClick={() => handlePageChange(page.id)}
+                  className={`nav-pill text-left ${
+                    currentPage === page.id ? 'nav-pill-active' : ''
+                  }`}
+                >
+                  {page.label}
+                </button>
+              ))}
+            </div>
 
-            <div className="border-t border-gray-200 mt-4 pt-4">
-              <p className="px-4 text-sm text-gray-600 mb-2">
-                {userLabel}
-              </p>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 w-full text-left py-2 px-4 text-gray-600 hover:text-red-600 transition font-medium"
-              >
+            <div className="flex items-center justify-between rounded-3xl border border-line bg-white/80 px-4 py-3 shadow-soft">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
+                  {getInitials(userLabel)}
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-muted">
+                    Signed in
+                  </p>
+                  <p className="text-sm font-semibold text-ink">
+                    {userLabel}
+                  </p>
+                </div>
+              </div>
+              <button onClick={handleLogout} className="btn-ghost">
                 <LogOut className="w-4 h-4" />
                 Logout
               </button>

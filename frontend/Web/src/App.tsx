@@ -31,19 +31,19 @@ function AppContent() {
   }
 
   return (
-    <>
+    <div className="app-shell">
       <Navigation
         currentPage={currentPage}
         onPageChange={setCurrentPage}
       />
 
-      <main>
+      <main className="app-main">
         {currentPage === 'dashboard' && <Dashboard />}
         {currentPage === 'analytics' && <Analytics />}
         {currentPage === 'insights' && <Insights />}
         {currentPage === 'goals' && <Goals />}
       </main>
-    </>
+    </div>
   );
 }
 

@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Loader, AlertCircle, RefreshCw, Lightbulb } from 'lucide-react';
+import {
+  Loader,
+  AlertCircle,
+  RefreshCw,
+  Lightbulb,
+  Sparkles,
+  LineChart,
+  Fingerprint,
+} from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import type { InsightSnapshot } from '../types';
@@ -132,17 +140,17 @@ export function Insights() {
           {
             title: 'Financial Summary',
             content: data.financial_summary?.content,
-            icon: '📈',
+            icon: LineChart,
           },
           {
             title: 'Category Insights',
             content: data.category_insights?.content,
-            icon: '🧾',
+            icon: Sparkles,
           },
           {
             title: 'Transaction Patterns',
             content: data.transaction_patterns?.content,
-            icon: '🔍',
+            icon: Fingerprint,
           },
         ].filter((i) => Boolean(i.content))
       : [];
@@ -163,7 +171,7 @@ export function Insights() {
   if (!auth && !loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-slate-500">
+        <p className="text-muted">
           Please log in to view your insights.
         </p>
       </div>
@@ -171,148 +179,146 @@ export function Insights() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              Insights
-            </h1>
-            <p className="text-gray-600">
-              AI-powered analysis of your financial behavior
-            </p>
-          </div>
-
-          {/* 🔄 HARD REFRESH BUTTON */}
-          <button
-            onClick={() => loadInsights(true)}
-            disabled={loading}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2 px-6 rounded-lg transition"
-          >
-            <RefreshCw
-              className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
-            />
-            Refresh
-          </button>
+    <div className="app-container space-y-10">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-2">
+          <p className="eyebrow">Insights</p>
+          <h1 className="text-4xl font-semibold text-ink">
+            AI powered clarity
+          </h1>
+          <p className="text-muted">
+            Narrative summaries to guide your next decisions.
+          </p>
         </div>
 
-        {error && (
-          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
-            <AlertCircle className="w-5 h-5 text-red-600" />
-            <p className="text-red-700">{error}</p>
-          </div>
-        )}
+        <button
+          onClick={() => loadInsights(true)}
+          disabled={loading}
+          className="btn-primary"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+      </div>
 
-        {loading && (
-          <div className="flex items-center justify-center py-12">
-            <Loader className="w-8 h-8 text-blue-600 animate-spin" />
-          </div>
-        )}
+      {error && (
+        <div className="card p-4 flex items-center gap-3 border-danger/20 bg-danger/10 text-danger">
+          <AlertCircle className="w-5 h-5 text-danger" />
+          <p>{error}</p>
+        </div>
+      )}
 
-        {!loading && insights.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {insights.map((card) => (
-              <div
-                key={card.title}
-                className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="text-3xl">{card.icon}</div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader className="w-8 h-8 text-primary animate-spin" />
+        </div>
+      )}
+
+      {!loading && insights.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {insights.map((card) => {
+            const Icon = card.icon;
+            return (
+              <div key={card.title} className="card p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-muted text-primary">
+                    <Icon className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-ink">
                       {card.title}
                     </h3>
-                    <p className="text-gray-700 whitespace-pre-line leading-relaxed">
-                      {card.content}
+                    <p className="text-xs uppercase tracking-[0.25em] text-muted">
+                      AI generated
                     </p>
                   </div>
+                </div>
+                <p className="text-sm text-ink/80 whitespace-pre-line leading-relaxed">
+                  {card.content}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {!loading && insights.length === 0 && !error && (
+        <div className="card-muted p-8 text-center">
+          <Lightbulb className="w-12 h-12 text-primary mx-auto mb-4" />
+          <p className="text-ink font-medium">
+            No insights available yet. Upload a bank statement to receive
+            personalized financial insights.
+          </p>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        <h2 className="text-2xl font-semibold text-ink">
+          Insights history
+        </h2>
+
+        {historyError && (
+          <div className="card p-4 flex items-center gap-3 border-danger/20 bg-danger/10 text-danger">
+            <AlertCircle className="w-5 h-5 text-danger" />
+            <p>{historyError}</p>
+          </div>
+        )}
+
+        {historyLoading && (
+          <div className="flex items-center justify-center py-6">
+            <Loader className="w-6 h-6 text-primary animate-spin" />
+          </div>
+        )}
+
+        {!historyLoading && history.length === 0 && !historyError && (
+          <div className="card p-6 text-muted">
+            No historical snapshots yet.
+          </div>
+        )}
+
+        {!historyLoading && history.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {history.map((snapshot) => (
+              <div key={snapshot.month} className="card p-6 space-y-4">
+                <div className="text-xs uppercase tracking-[0.3em] text-muted">
+                  {formatMonth(snapshot.month)}
+                </div>
+                <div className="space-y-4 text-sm">
+                  {snapshot.financial_summary?.content && (
+                    <div>
+                      <div className="text-xs uppercase text-muted mb-1">
+                        Financial Summary
+                      </div>
+                      <p className="text-ink/80 whitespace-pre-line">
+                        {snapshot.financial_summary.content}
+                      </p>
+                    </div>
+                  )}
+                  {snapshot.category_insights?.content && (
+                    <div>
+                      <div className="text-xs uppercase text-muted mb-1">
+                        Category Insights
+                      </div>
+                      <p className="text-ink/80 whitespace-pre-line">
+                        {snapshot.category_insights.content}
+                      </p>
+                    </div>
+                  )}
+                  {snapshot.transaction_patterns?.content && (
+                    <div>
+                      <div className="text-xs uppercase text-muted mb-1">
+                        Transaction Patterns
+                      </div>
+                      <p className="text-ink/80 whitespace-pre-line">
+                        {snapshot.transaction_patterns.content}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
-
-        {!loading && insights.length === 0 && !error && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
-            <Lightbulb className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-            <p className="text-blue-700 font-medium">
-              No insights available yet. Upload a bank statement to receive
-              personalized financial insights.
-            </p>
-          </div>
-        )}
-
-        <div className="mt-12">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-            Insights History
-          </h2>
-
-          {historyError && (
-            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <AlertCircle className="w-5 h-5 text-red-600" />
-              <p className="text-red-700">{historyError}</p>
-            </div>
-          )}
-
-          {historyLoading && (
-            <div className="flex items-center justify-center py-6">
-              <Loader className="w-6 h-6 text-blue-600 animate-spin" />
-            </div>
-          )}
-
-          {!historyLoading && history.length === 0 && !historyError && (
-            <div className="bg-white rounded-lg shadow-sm p-6 text-gray-600">
-              No historical snapshots yet.
-            </div>
-          )}
-
-          {!historyLoading && history.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {history.map((snapshot) => (
-                <div
-                  key={snapshot.month}
-                  className="bg-white rounded-lg shadow-md p-6"
-                >
-                  <div className="text-sm text-gray-500 mb-3">
-                    {formatMonth(snapshot.month)}
-                  </div>
-                  <div className="space-y-4">
-                    {snapshot.financial_summary?.content && (
-                      <div>
-                        <div className="text-xs uppercase text-gray-500 mb-1">
-                          Financial Summary
-                        </div>
-                        <p className="text-gray-700 whitespace-pre-line">
-                          {snapshot.financial_summary.content}
-                        </p>
-                      </div>
-                    )}
-                    {snapshot.category_insights?.content && (
-                      <div>
-                        <div className="text-xs uppercase text-gray-500 mb-1">
-                          Category Insights
-                        </div>
-                        <p className="text-gray-700 whitespace-pre-line">
-                          {snapshot.category_insights.content}
-                        </p>
-                      </div>
-                    )}
-                    {snapshot.transaction_patterns?.content && (
-                      <div>
-                        <div className="text-xs uppercase text-gray-500 mb-1">
-                          Transaction Patterns
-                        </div>
-                        <p className="text-gray-700 whitespace-pre-line">
-                          {snapshot.transaction_patterns.content}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

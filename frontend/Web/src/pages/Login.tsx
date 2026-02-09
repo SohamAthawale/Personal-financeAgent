@@ -43,74 +43,108 @@ export function Login({ onSignupClick }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Finance Analyzer
-          </h1>
-          <p className="text-gray-600">Log in to your account</p>
+    <div className="auth-shell">
+      <div className="auth-grid">
+        <div className="auth-highlight space-y-6">
+          <img
+            src="/brand-lockup.svg"
+            alt="Personal Finance Agent"
+            className="h-16"
+          />
+          <div className="space-y-3">
+            <p className="eyebrow">Personal Finance Agent</p>
+            <h1 className="text-4xl font-semibold text-ink">
+              Confidence for every transaction
+            </h1>
+            <p className="text-muted">
+              Upload bank statements, track trends, and get clear insights
+              with a calm, focused workspace.
+            </p>
+          </div>
+          <div className="grid gap-4">
+            <div className="hero-card">
+              <p className="text-sm font-semibold text-ink">
+                Fast parsing
+              </p>
+              <p className="text-sm text-muted">
+                Automatic categorization with review support.
+              </p>
+            </div>
+            <div className="hero-card">
+              <p className="text-sm font-semibold text-ink">
+                Actionable analytics
+              </p>
+              <p className="text-sm text-muted">
+                See spending patterns across months in seconds.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-4">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-              <p className="text-red-700 text-sm">{error}</p>
+        <div className="auth-panel">
+          <div className="mb-6 space-y-2">
+            <p className="eyebrow">Welcome back</p>
+            <h2 className="text-3xl font-semibold text-ink">
+              Log in to your workspace
+            </h2>
+            <p className="text-sm text-muted">
+              Use your email and password to continue.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="flex items-center gap-3 rounded-2xl border border-danger/30 bg-danger/10 p-4">
+                <AlertCircle className="w-5 h-5 text-danger flex-shrink-0" />
+                <p className="text-danger text-sm">{error}</p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-ink mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                className="input"
+              />
             </div>
-          )}
 
-          {/* ---------- Email ---------- */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+            <div>
+              <label className="block text-sm font-medium text-ink mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                className="input"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full"
+            >
+              {loading ? 'Logging in...' : 'Log In'}
+            </button>
+          </form>
+
+          <div className="mt-6 space-y-3">
+            <p className="text-sm text-muted">
+              Need an account?
+            </p>
+            <button onClick={onSignupClick} className="btn-secondary w-full">
+              Create an Account
+            </button>
           </div>
-
-          {/* ---------- Password ---------- */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              autoComplete="current-password"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition text-lg"
-          >
-            {loading ? 'Logging in…' : 'Log In'}
-          </button>
-        </form>
-
-        {/* ---------- Signup CTA ---------- */}
-        <div className="mt-6 text-center space-y-3">
-          <p className="text-gray-600 text-sm">
-            Don’t have an account?
-          </p>
-
-          <button
-            onClick={onSignupClick}
-            className="w-full bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 font-semibold py-2 rounded-lg transition"
-          >
-            Create an Account
-          </button>
         </div>
       </div>
     </div>

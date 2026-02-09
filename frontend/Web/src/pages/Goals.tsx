@@ -193,204 +193,200 @@ export function Goals() {
   if (!auth) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-slate-500">Please log in to view goals.</p>
+        <p className="text-muted">Please log in to view goals.</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Target className="text-indigo-600" size={32} />
-          <h1 className="text-4xl font-bold text-slate-800">
-            Financial Goals
+    <div className="app-container space-y-8">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-2">
+          <p className="eyebrow">Goals</p>
+          <h1 className="text-4xl font-semibold text-ink">
+            Financial goals studio
           </h1>
+          <p className="text-muted">
+            Model targets, track feasibility, and plan savings with AI support.
+          </p>
         </div>
+        <div className="flex items-center gap-2 text-muted">
+          <Target className="text-primary" size={28} />
+          <span className="text-sm uppercase tracking-[0.25em]">
+            Plan ahead
+          </span>
+        </div>
+      </div>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 p-4 rounded text-red-700 flex gap-2">
-            <AlertCircle /> {error}
-          </div>
-        )}
+      {error && (
+        <div className="card p-4 flex items-center gap-2 border-danger/20 bg-danger/10 text-danger">
+          <AlertCircle /> {error}
+        </div>
+      )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          {/* LEFT – Goals */}
-          <div className="xl:col-span-1 space-y-6">
-            {/* Create Goal */}
-            <div className="bg-white p-6 rounded-xl shadow-sm">
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <Plus /> Create Goal
-              </h3>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="xl:col-span-1 space-y-6">
+          <div className="card p-6 space-y-4">
+            <h3 className="section-title flex items-center gap-2">
+              <Plus /> Create Goal
+            </h3>
 
-              <input
-                className="input mb-2"
-                placeholder="Goal name"
-                value={newGoal.name}
-                onChange={(e) =>
-                  setNewGoal({ ...newGoal, name: e.target.value })
-                }
-              />
+            <input
+              className="input"
+              placeholder="Goal name"
+              value={newGoal.name}
+              onChange={(e) =>
+                setNewGoal({ ...newGoal, name: e.target.value })
+              }
+            />
 
-              <input
-                className="input mb-2"
-                type="number"
-                placeholder="Target amount"
-                value={newGoal.target_amount}
-                onChange={(e) =>
-                  setNewGoal({
-                    ...newGoal,
-                    target_amount: Number(e.target.value),
-                  })
-                }
-              />
+            <input
+              className="input"
+              type="number"
+              placeholder="Target amount"
+              value={newGoal.target_amount}
+              onChange={(e) =>
+                setNewGoal({
+                  ...newGoal,
+                  target_amount: Number(e.target.value),
+                })
+              }
+            />
 
-              <input
-                className="input"
-                type="date"
-                value={newGoal.deadline}
-                onChange={(e) =>
-                  setNewGoal({ ...newGoal, deadline: e.target.value })
-                }
-              />
+            <input
+              className="input"
+              type="date"
+              value={newGoal.deadline}
+              onChange={(e) =>
+                setNewGoal({ ...newGoal, deadline: e.target.value })
+              }
+            />
 
-              <button
-                onClick={handleAddGoal}
-                className="btn-primary mt-4 w-full flex justify-center gap-2"
-              >
-                <Plus /> Add Goal
-              </button>
-            </div>
-
-            {/* Goal List */}
-            <div className="bg-white p-6 rounded-xl shadow-sm">
-              <h3 className="font-semibold mb-4">
-                Your Goals ({goals.length})
-              </h3>
-
-              {goals.length === 0 && (
-                <p className="text-sm text-slate-500">
-                  No goals added yet
-                </p>
-              )}
-
-              {goals.map((g) => (
-                <div
-                  key={g.id}
-                  className="border rounded-lg p-4 mb-3 flex justify-between items-center"
-                >
-                  <div>
-                    <p className="font-semibold">{g.name}</p>
-                    <p className="text-sm text-slate-600">
-                      ₹{g.target_amount} •{' '}
-                      {new Date(g.deadline).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <button onClick={() => handleDeleteGoal(g.id!)}>
-                    <X className="text-red-500" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* RIGHT – Analytics & AI */}
-          <div className="xl:col-span-2 space-y-6">
             <button
-              onClick={handleGetRecommendations}
+              onClick={handleAddGoal}
               className="btn-primary w-full flex justify-center gap-2"
-              disabled={loading}
             >
-              {loading ? <Loader className="animate-spin" /> : <Sparkles />}
-              {loading ? 'Analyzing finances...' : 'Run Analytics'}
+              <Plus /> Add Goal
             </button>
+          </div>
 
-            {/* Metrics */}
-            {metrics && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <MetricCard label="Income" value={metrics.monthly_income} />
-                <MetricCard
-                  label="Expenses"
-                  value={metrics.monthly_expense}
-                />
-                <MetricCard
-                  label="Savings"
-                  value={metrics.monthly_savings}
-                />
-                <MetricCard
-                  label="Savings Rate"
-                  value={`${(metrics.savings_rate * 100).toFixed(1)}%`}
-                />
-              </div>
+          <div className="card p-6 space-y-4">
+            <h3 className="section-title">
+              Your Goals ({goals.length})
+            </h3>
+
+            {goals.length === 0 && (
+              <p className="text-sm text-muted">
+                No goals added yet.
+              </p>
             )}
 
-            {/* AI Insights */}
-            {recommendations?.recommendations?.goals && (
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
-                  <TrendingUp /> AI Insights
-                </h3>
-                <ul className="list-disc pl-5 text-sm space-y-1">
-                  {recommendations.recommendations.goals.map((r, i) => (
-                    <li key={i}>{r.message}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Goal Evaluations */}
-            {safeGoalEvaluations.map((g, i) => (
+            {goals.map((g) => (
               <div
-                key={i}
-                className={`bg-white p-6 rounded-xl shadow-sm border ${
-                  g.feasible
-                    ? 'border-green-200'
-                    : 'border-yellow-200'
-                }`}
+                key={g.id}
+                className="flex items-center justify-between rounded-2xl border border-line bg-white/80 px-4 py-3"
               >
-                <div className="flex items-center gap-2 font-semibold mb-2">
-                  {g.feasible ? (
-                    <CheckCircle className="text-green-600" />
-                  ) : (
-                    <AlertTriangle className="text-yellow-600" />
-                  )}
-                  {g.goal}
+                <div>
+                  <p className="font-semibold text-ink">{g.name}</p>
+                  <p className="text-sm text-muted">
+                    ₹{g.target_amount} ·{' '}
+                    {new Date(g.deadline).toLocaleDateString()}
+                  </p>
                 </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
-                  <Info label="Months Left" value={g.months_remaining} />
-                  <Info
-                    label="Required / mo"
-                    value={`₹${g.required_monthly_saving}`}
-                  />
-                  <Info
-                    label="Current / mo"
-                    value={`₹${g.current_monthly_saving}`}
-                  />
-                </div>
-
-                {g.projection_series.length > 0 && (
-                  <div className="h-56 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={g.projection_series}>
-                        <XAxis dataKey="month" hide />
-                        <YAxis />
-                        <Tooltip />
-                        <Line
-                          type="monotone"
-                          dataKey="amount"
-                          stroke="#4f46e5"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
+                <button
+                  onClick={() => handleDeleteGoal(g.id!)}
+                  className="btn-danger"
+                >
+                  <X className="text-danger" />
+                </button>
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="xl:col-span-2 space-y-6">
+          <button
+            onClick={handleGetRecommendations}
+            className="btn-primary w-full flex justify-center gap-2"
+            disabled={loading}
+          >
+            {loading ? <Loader className="animate-spin" /> : <Sparkles />}
+            {loading ? 'Analyzing finances...' : 'Run Analytics'}
+          </button>
+
+          {metrics && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <MetricCard label="Income" value={metrics.monthly_income} />
+              <MetricCard label="Expenses" value={metrics.monthly_expense} />
+              <MetricCard label="Savings" value={metrics.monthly_savings} />
+              <MetricCard
+                label="Savings Rate"
+                value={`${(metrics.savings_rate * 100).toFixed(1)}%`}
+              />
+            </div>
+          )}
+
+          {recommendations?.recommendations?.goals && (
+            <div className="card p-6">
+              <h3 className="section-title flex items-center gap-2 mb-3">
+                <TrendingUp /> AI Insights
+              </h3>
+              <ul className="list-disc pl-5 text-sm space-y-1 text-muted">
+                {recommendations.recommendations.goals.map((r, i) => (
+                  <li key={i}>{r.message}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {safeGoalEvaluations.map((g, i) => (
+            <div
+              key={i}
+              className={`card p-6 border ${
+                g.feasible ? 'border-success/30' : 'border-warning/40'
+              }`}
+            >
+              <div className="flex items-center gap-2 font-semibold mb-2 text-ink">
+                {g.feasible ? (
+                  <CheckCircle className="text-success" />
+                ) : (
+                  <AlertTriangle className="text-warning" />
+                )}
+                {g.goal}
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
+                <Info label="Months Left" value={g.months_remaining} />
+                <Info
+                  label="Required / mo"
+                  value={`₹${g.required_monthly_saving}`}
+                />
+                <Info
+                  label="Current / mo"
+                  value={`₹${g.current_monthly_saving}`}
+                />
+              </div>
+
+              {g.projection_series.length > 0 && (
+                <div className="h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={g.projection_series}>
+                      <XAxis dataKey="month" hide />
+                      <YAxis />
+                      <Tooltip />
+                      <Line
+                        type="monotone"
+                        dataKey="amount"
+                        stroke="#0f766e"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -409,9 +405,9 @@ function MetricCard({
   value: number | string;
 }) {
   return (
-    <div className="bg-white p-4 rounded-xl shadow-sm">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="text-xl font-semibold text-slate-800">
+    <div className="card p-4">
+      <p className="text-sm text-muted">{label}</p>
+      <p className="text-xl font-semibold text-ink">
         {typeof value === 'number' ? `₹${value}` : value}
       </p>
     </div>
@@ -427,8 +423,8 @@ function Info({
 }) {
   return (
     <div>
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="font-semibold">{value}</p>
+      <p className="text-xs text-muted">{label}</p>
+      <p className="font-semibold text-ink">{value}</p>
     </div>
   );
 }
