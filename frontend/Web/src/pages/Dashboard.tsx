@@ -528,36 +528,67 @@ export function Dashboard() {
       {/* Modals */}
       {explainTx && (
         <Modal onClose={() => setExplainTx(null)}>
-          <pre className="text-xs bg-surface-muted p-4 rounded-2xl">
-            {JSON.stringify(explainTx, null, 2)}
-          </pre>
+          <h3 className="section-title mb-4">Classification Reasoning</h3>
+          <div className="space-y-3 text-sm">
+            <div className="rounded-2xl border border-line bg-surface-muted p-4">
+              <p className="eyebrow mb-1">Reasoning</p>
+              <p className="text-ink/80 leading-relaxed">{explainTx.reasoning}</p>
+            </div>
+            {explainTx.rules_fired?.length > 0 && (
+              <div className="rounded-2xl border border-line bg-surface-muted p-4">
+                <p className="eyebrow mb-2">Rules Fired</p>
+                <div className="flex flex-wrap gap-2">
+                  {explainTx.rules_fired.map((rule, i) => (
+                    <span key={i} className="badge">{rule}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex items-center justify-between rounded-2xl border border-line bg-surface-muted px-4 py-3">
+              <span className="text-muted">Model confidence</span>
+              <span className="font-semibold text-ink">
+                {((explainTx.model_confidence ?? 0) * 100).toFixed(0)}%
+              </span>
+            </div>
+          </div>
         </Modal>
       )}
 
       {editTx && (
         <Modal onClose={() => setEditTx(null)}>
-          <h3 className="section-title mb-3">Edit Transaction</h3>
-          <input
-            className="input mb-2"
-            value={editMerchant}
-            onChange={(e) => setEditMerchant(e.target.value)}
-          />
-          <input
-            className="input mb-2"
-            value={editCategory}
-            onChange={(e) => setEditCategory(e.target.value)}
-          />
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
-            />
-            Remember this correction
-          </label>
-          <button onClick={saveEdit} className="btn-primary mt-4">
-            Save
-          </button>
+          <h3 className="section-title mb-4">Edit Transaction</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-ink mb-1.5">Merchant</label>
+              <input
+                className="input"
+                value={editMerchant}
+                onChange={(e) => setEditMerchant(e.target.value)}
+                placeholder="Merchant name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink mb-1.5">Category</label>
+              <input
+                className="input"
+                value={editCategory}
+                onChange={(e) => setEditCategory(e.target.value)}
+                placeholder="Category"
+              />
+            </div>
+            <label className="flex items-center gap-3 rounded-2xl border border-line bg-surface-muted px-4 py-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="accent-primary"
+              />
+              <span className="text-sm text-ink">Remember this correction for future transactions</span>
+            </label>
+            <button onClick={saveEdit} className="btn-primary w-full">
+              Save Changes
+            </button>
+          </div>
         </Modal>
       )}
     </div>

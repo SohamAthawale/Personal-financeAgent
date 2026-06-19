@@ -213,16 +213,16 @@ export function Analytics() {
     .sort((a, b) => b.expense - a.expense);
 
   const categoryColors = [
-    '#0f766e',
+    '#2dd4bf',
     '#f97316',
-    '#1d4ed8',
-    '#c2410c',
-    '#0ea5e9',
-    '#16a34a',
-    '#db2777',
-    '#9333ea',
-    '#ca8a04',
-    '#334155',
+    '#818cf8',
+    '#f87171',
+    '#38bdf8',
+    '#4ade80',
+    '#e879f9',
+    '#c084fc',
+    '#fbbf24',
+    '#94a3b8',
   ];
 
   /* =======================
@@ -366,11 +366,11 @@ export function Analytics() {
       {monthly.length > 0 && (
         <ChartCard title="Month-to-Month Comparison">
           <LineChart data={monthly}>
-            <XAxis dataKey="month" />
-            <YAxis />
-            <Tooltip />
-            <Line dataKey="income" stroke="#0f766e" />
-            <Line dataKey="expense" stroke="#c2410c" />
+            <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={{ background: '#0d1f1c', border: '1px solid #1e3330', borderRadius: '12px', fontSize: '12px', color: '#e2e8f0' }} />
+            <Line dataKey="income" stroke="#2dd4bf" strokeWidth={2} dot={false} />
+            <Line dataKey="expense" stroke="#f97316" strokeWidth={2} dot={false} />
           </LineChart>
         </ChartCard>
       )}
@@ -400,6 +400,7 @@ export function Analytics() {
                     ))}
                   </Pie>
                   <Tooltip
+                    contentStyle={{ background: '#0d1f1c', border: '1px solid #1e3330', borderRadius: '12px', fontSize: '12px', color: '#e2e8f0' }}
                     formatter={(value, _name, props) => {
                       const raw = Array.isArray(value)
                         ? value[0]
@@ -454,11 +455,11 @@ export function Analytics() {
       {yearly.length > 0 && (
         <ChartCard title="Yearly Comparison">
           <BarChart data={yearly}>
-            <XAxis dataKey="year" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="income" fill="#0f766e" />
-            <Bar dataKey="expense" fill="#c2410c" />
+            <XAxis dataKey="year" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={{ background: '#0d1f1c', border: '1px solid #1e3330', borderRadius: '12px', fontSize: '12px', color: '#e2e8f0' }} />
+            <Bar dataKey="income" fill="#2dd4bf" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="expense" fill="#f97316" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ChartCard>
       )}

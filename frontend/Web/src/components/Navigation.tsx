@@ -72,7 +72,7 @@ export function Navigation({
           </div>
 
           {/* Desktop menu */}
-          <div className="hidden md:flex items-center gap-2 rounded-full border border-line bg-white/70 p-1 shadow-soft">
+          <div className="hidden md:flex items-center gap-2 rounded-full border border-line bg-surface-muted/60 p-1">
             {pages.map((page) => (
               <button
                 key={page.id}
@@ -89,7 +89,7 @@ export function Navigation({
 
           {/* Desktop user info */}
           <div className="hidden md:flex items-center gap-3">
-            <div className="flex items-center gap-3 rounded-full border border-line bg-white px-3 py-2 shadow-soft">
+            <div className="flex items-center gap-3 rounded-full border border-line bg-surface-muted px-3 py-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
                 {getInitials(userLabel)}
               </div>
@@ -114,7 +114,7 @@ export function Navigation({
           {/* Mobile menu toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden rounded-full border border-line bg-white p-2 text-muted shadow-soft"
+            className="md:hidden rounded-full border border-line bg-surface-muted p-2 text-muted"
           >
             {mobileMenuOpen ? (
               <X className="w-6 h-6" />
@@ -127,7 +127,7 @@ export function Navigation({
         {/* Mobile menu */}
         {mobileMenuOpen && (
           <div className="md:hidden space-y-3 border-t border-line pb-4 pt-4">
-            <div className="grid gap-2 rounded-3xl border border-line bg-white/80 p-2 shadow-soft">
+            <div className="grid gap-2 rounded-3xl border border-line bg-surface-muted/80 p-2">
               {pages.map((page) => (
                 <button
                   key={page.id}
@@ -141,7 +141,7 @@ export function Navigation({
               ))}
             </div>
 
-            <div className="flex items-center justify-between rounded-3xl border border-line bg-white/80 px-4 py-3 shadow-soft">
+            <div className="flex items-center justify-between rounded-3xl border border-line bg-surface-muted/80 px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
                   {getInitials(userLabel)}

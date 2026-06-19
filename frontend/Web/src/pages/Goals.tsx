@@ -284,7 +284,7 @@ export function Goals() {
             {goals.map((g) => (
               <div
                 key={g.id}
-                className="flex items-center justify-between rounded-2xl border border-line bg-white/80 px-4 py-3"
+                className="flex items-center justify-between rounded-2xl border border-line bg-surface-muted/80 px-4 py-3"
               >
                 <div>
                   <p className="font-semibold text-ink">{g.name}</p>
@@ -372,13 +372,13 @@ export function Goals() {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={g.projection_series}>
                       <XAxis dataKey="month" hide />
-                      <YAxis />
-                      <Tooltip />
+                      <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={{ background: '#0d1f1c', border: '1px solid #1e3330', borderRadius: '12px', fontSize: '12px', color: '#e2e8f0' }} />
                       <Line
                         type="monotone"
                         dataKey="amount"
-                        stroke="#0f766e"
-                        strokeWidth={2}
+                        stroke="#fdba74"
+                        strokeWidth={2.5}
                         dot={false}
                       />
                     </LineChart>

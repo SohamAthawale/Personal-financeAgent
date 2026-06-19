@@ -1,0 +1,44 @@
+# ── Secrets & environment ─────────────────────────────────────────────
+.env
+.env.*
+*.env
+.env.pm2
+secrets.json
+
+# ── Python ────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Database dumps & uploads ──────────────────────────────────────────
+*.dump
+*.sql
+uploads/
+output/
+
+# ── Node ──────────────────────────────────────────────────────────────
+node_modules/
+frontend/Web/dist/
+
+# ── Cache & OS ────────────────────────────────────────────────────────
+.cache/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ── Temp ──────────────────────────────────────────────────────────────
+tempCodeRunnerFile.py
